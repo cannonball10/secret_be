@@ -1,0 +1,1073 @@
+openapi: 3.0.3
+info:
+  title: Secret Hitler Backend
+  version: 0.1.0
+  description: |
+    HTTP + Server-Sent Events API for the Secret Hitler app.
+
+    ## Device model
+
+    There are two kinds of clients:
+
+    * **Board device** – the host's game-board display. It performs
+      lifecycle actions (start, force-progress, timer-tick) under
+      `/host/*` and subscribes to `/stream/board` to receive **only
+      broadcast** envelopes.
+    * **Player device** – each player's phone. It performs per-role
+      actions under `/player/*` (nominate, vote, discard, enact, veto,
+      executive action) and subscribes to `/stream/player` to receive
+      broadcast envelopes plus private **whisper** envelopes (role
+      reveal, drawn policies, investigation results, policy peek).
+
+    ## Authentication
+
+    All endpoints (except `GET /healthz`) require a bearer token. The
+    token is resolved to a user ID by the configured `Authenticator`
+    (`ClerkAuth` in production, `StaticAuth` / `NopAuth` in tests).
+
+    ## Streaming
+
+    Streams are Server-Sent Events. Each SSE frame looks like:
+
+    ```
+    id: <subscriptionId>-<seq>
+    event: <eventType>        # one of EventType
+    data: {"gameId": "...", "event": {...}, "audience": {...}, "payload": {...}}
+    ```
+
+    The `event:` field is one of the `EventType` enum values so native
+    `EventSource` listeners can attach by type.
+
+servers:
+  - url: /api/v1
+    description: Versioned API root (pair with the host, e.g. https://api.example.com/api/v1)
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Bearer token issued by the configured identity provider (Clerk
+        in production). Also accepted via the `X-Auth-Token` header for
+        device clients that cannot set `Authorization`.
+
+  parameters:
+    GameIdPath:
+      name: gameId
+      in: path
+      required: true
+      schema: {type: string}
+      description: ULID of the game.
+
+  # -------------------------------------------------------------------------
+  # Schemas: enums
+  # -------------------------------------------------------------------------
+  schemas:
+    # --- enums ------------------------------------------------------------
+    Role:
+      type: string
+      enum: [liberal, fascist, hitler]
+      description: Secret role assigned at game start.
+
+    Party:
+      type: string
+      enum: [liberal, fascist]
+      description: Public party. Hitler's party is fascist.
+
+    PolicyType:
+      type: string
+      enum: [liberal, fascist]
+
+    GameStatus:
+      type: string
+      enum: [lobby, in_progress, completed, abandoned]
+
+    GamePhase:
+      type: string
+      enum:
+        - lobby
+        - nomination
+        - election
+        - legislative_president
+        - legislative_chancellor
+        - veto_requested
+        - executive_action
+        - game_over
+
+    VoteChoice:
+      type: string
+      enum: [ja, nein]
+
+    GovernmentStatus:
+      type: string
+      enum: [proposed, passed, rejected, enacted, vetoed]
+
+    ExecutiveActionType:
+      type: string
+      enum:
+        - investigate_loyalty
+        - special_election
+        - policy_peek
+        - execution
+        - top_deck
+
+    WinCondition:
+      type: string
+      enum:
+        - liberal_policies
+        - fascist_policies
+        - hitler_elected_chancellor
+        - hitler_executed
+
+    EventType:
+      type: string
+      enum:
+        - game_created
+        - player_joined
+        - player_left
+        - game_started
+        - roles_assigned
+        - chancellor_nominated
+        - vote_cast
+        - election_result
+        - policies_drawn
+        - president_discarded
+        - chancellor_enacted
+        - veto_proposed
+        - veto_resolved
+        - executive_action
+        - election_tracker_advanced
+        - top_deck_enacted
+        - deck_reshuffled
+        - player_executed
+        - game_ended
+
+    ProgressReason:
+      type: string
+      enum: [action, timeout, forced, all_voted]
+      description: |
+        Why a phase advanced. Attached to phase-change and election-result
+        events so clients can distinguish normal progress from timer
+        cutoffs, host-forced advances, and unanimous-vote resolutions.
+
+    AudienceScope:
+      type: string
+      enum: [broadcast, player]
+
+    DeviceRole:
+      type: string
+      enum: [board, player]
+
+    # --- core models ------------------------------------------------------
+
+    Error:
+      type: object
+      properties:
+        error: {type: string}
+      required: [error]
+
+    Timestamps:
+      type: object
+      properties:
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
+
+    Game:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            gameId: {type: string}
+            joinCode: {type: string}
+            hostUserId: {type: string}
+            status: {$ref: '#/components/schemas/GameStatus'}
+            phase: {$ref: '#/components/schemas/GamePhase'}
+            round: {type: integer, format: int32}
+            presidentSeat: {type: integer, format: int32}
+            chancellorSeat: {type: integer, format: int32, nullable: true}
+            previousPresidentSeat: {type: integer, format: int32, nullable: true}
+            previousChancellorSeat: {type: integer, format: int32, nullable: true}
+            specialElectionReturnSeat: {type: integer, format: int32, nullable: true}
+            currentGovernmentId: {type: string}
+            liberalPoliciesEnacted: {type: integer, format: int32}
+            fascistPoliciesEnacted: {type: integer, format: int32}
+            electionTracker: {type: integer, format: int32, minimum: 0, maximum: 3}
+            vetoUnlocked: {type: boolean}
+            playerCount: {type: integer, format: int32}
+            winner: {$ref: '#/components/schemas/Party'}
+            winCondition: {$ref: '#/components/schemas/WinCondition'}
+            phaseDeadline: {type: string, format: date-time, nullable: true}
+            pendingActionType: {$ref: '#/components/schemas/ExecutiveActionType'}
+            pendingActionId: {type: string}
+            startedAt: {type: string, format: date-time, nullable: true}
+            endedAt: {type: string, format: date-time, nullable: true}
+
+    Player:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            playerId: {type: string}
+            gameId: {type: string}
+            userId: {type: string}
+            displayName: {type: string}
+            seat: {type: integer, format: int32}
+            role:
+              $ref: '#/components/schemas/Role'
+              description: |
+                Only present on a player's own record (via whisper) or
+                after the game ends. The `GET /games/{gameId}` endpoint
+                always scrubs this field while the game is in progress.
+            party:
+              $ref: '#/components/schemas/Party'
+              description: Scrubbed while the game is in progress.
+            isHost: {type: boolean}
+            isAlive: {type: boolean}
+            isConnected: {type: boolean}
+            investigatedBySeats:
+              type: array
+              items: {type: integer}
+
+    Government:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            governmentId: {type: string}
+            gameId: {type: string}
+            round: {type: integer, format: int32}
+            presidentPlayerId: {type: string}
+            chancellorPlayerId: {type: string}
+            presidentSeat: {type: integer, format: int32}
+            chancellorSeat: {type: integer, format: int32, nullable: true}
+            status: {$ref: '#/components/schemas/GovernmentStatus'}
+            isSpecialElection: {type: boolean}
+            jaVotes: {type: integer, format: int32}
+            neinVotes: {type: integer, format: int32}
+            enactedPolicy: {$ref: '#/components/schemas/PolicyType'}
+            vetoProposed: {type: boolean}
+            vetoAccepted: {type: boolean}
+
+    Vote:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            gameId: {type: string}
+            governmentId: {type: string}
+            playerId: {type: string}
+            choice: {$ref: '#/components/schemas/VoteChoice'}
+
+    EnactedPolicy:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            gameId: {type: string}
+            sequence: {type: integer, format: int32}
+            type: {$ref: '#/components/schemas/PolicyType'}
+            governmentId: {type: string}
+            topDeck: {type: boolean}
+
+    ExecutiveAction:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            actionId: {type: string}
+            gameId: {type: string}
+            round: {type: integer, format: int32}
+            type: {$ref: '#/components/schemas/ExecutiveActionType'}
+            presidentPlayerId: {type: string}
+            targetPlayerId: {type: string}
+            revealedParty: {$ref: '#/components/schemas/Party'}
+            completed: {type: boolean}
+
+    GameEvent:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            eventId: {type: string}
+            gameId: {type: string}
+            type: {$ref: '#/components/schemas/EventType'}
+            actorPlayerId: {type: string}
+            targetPlayerId: {type: string}
+            data:
+              type: object
+              additionalProperties: true
+
+    Passport:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            userId: {type: string}
+            gamesPlayed: {type: integer, format: int32}
+            gamesWon: {type: integer, format: int32}
+            winsAsLiberal: {type: integer, format: int32}
+            winsAsFascist: {type: integer, format: int32}
+            winsAsHitler: {type: integer, format: int32}
+            timesLiberal: {type: integer, format: int32}
+            timesFascist: {type: integer, format: int32}
+            timesHitler: {type: integer, format: int32}
+            timesExecuted: {type: integer, format: int32}
+            timesElectedPresident: {type: integer, format: int32}
+            timesElectedChancellor: {type: integer, format: int32}
+            lastPlayedAt: {type: string, format: date-time, nullable: true}
+
+    PassportEntry:
+      allOf:
+        - $ref: '#/components/schemas/Timestamps'
+        - type: object
+          properties:
+            userId: {type: string}
+            gameId: {type: string}
+            playerId: {type: string}
+            role: {$ref: '#/components/schemas/Role'}
+            party: {$ref: '#/components/schemas/Party'}
+            won: {type: boolean}
+            winCondition: {$ref: '#/components/schemas/WinCondition'}
+            seat: {type: integer}
+            playerCount: {type: integer}
+            startedAt: {type: string, format: date-time}
+            endedAt: {type: string, format: date-time}
+
+    # --- streaming envelope ---------------------------------------------
+
+    Audience:
+      type: object
+      properties:
+        scope: {$ref: '#/components/schemas/AudienceScope'}
+        playerId:
+          type: string
+          description: Only set when scope is "player".
+
+    Envelope:
+      description: |
+        Wire-format wrapper emitted on SSE streams. The `payload` field
+        is a typed payload keyed by `event.type` — see the payload
+        schemas below for the mapping.
+      type: object
+      required: [gameId, event, audience]
+      properties:
+        gameId: {type: string}
+        event: {$ref: '#/components/schemas/GameEvent'}
+        audience: {$ref: '#/components/schemas/Audience'}
+        payload:
+          description: |
+            Event-specific payload. Matched by `event.type`:
+
+            - `game_created`            → GameCreatedPayload
+            - `player_joined`           → PlayerJoinedPayload
+            - `game_started`            → GameStartedPayload
+            - `roles_assigned`          → RoleAssignedPayload (whispered)
+            - `chancellor_nominated`    → ChancellorNominatedPayload
+            - `vote_cast`               → VoteCastPayload
+            - `election_result`         → ElectionResultPayload
+            - `policies_drawn`          → PoliciesDrawnPayload (whispered to president)
+            - `president_discarded`     → PresidentDiscardedPayload (broadcast counts; whispered options to chancellor)
+            - `chancellor_enacted`      → ChancellorEnactedPayload
+            - `veto_proposed`           → VetoProposedPayload
+            - `veto_resolved`           → VetoResolvedPayload
+            - `executive_action`        → ExecutiveActionPayload (broadcast) or InvestigateResultPayload / PolicyPeekPayload (whispered)
+            - `election_tracker_advanced` → ElectionTrackerPayload
+            - `top_deck_enacted`        → TopDeckPayload
+            - `deck_reshuffled`         → DeckReshuffledPayload
+            - `player_executed`         → PlayerExecutedPayload
+            - `game_ended`              → GameEndedPayload
+            - any phase transition      → PhaseChangedPayload
+          oneOf:
+            - $ref: '#/components/schemas/GameCreatedPayload'
+            - $ref: '#/components/schemas/PlayerJoinedPayload'
+            - $ref: '#/components/schemas/GameStartedPayload'
+            - $ref: '#/components/schemas/RoleAssignedPayload'
+            - $ref: '#/components/schemas/ChancellorNominatedPayload'
+            - $ref: '#/components/schemas/VoteCastPayload'
+            - $ref: '#/components/schemas/ElectionResultPayload'
+            - $ref: '#/components/schemas/PoliciesDrawnPayload'
+            - $ref: '#/components/schemas/PresidentDiscardedPayload'
+            - $ref: '#/components/schemas/ChancellorEnactedPayload'
+            - $ref: '#/components/schemas/VetoProposedPayload'
+            - $ref: '#/components/schemas/VetoResolvedPayload'
+            - $ref: '#/components/schemas/ExecutiveActionPayload'
+            - $ref: '#/components/schemas/InvestigateResultPayload'
+            - $ref: '#/components/schemas/PolicyPeekPayload'
+            - $ref: '#/components/schemas/ElectionTrackerPayload'
+            - $ref: '#/components/schemas/TopDeckPayload'
+            - $ref: '#/components/schemas/DeckReshuffledPayload'
+            - $ref: '#/components/schemas/PlayerExecutedPayload'
+            - $ref: '#/components/schemas/GameEndedPayload'
+            - $ref: '#/components/schemas/PhaseChangedPayload'
+
+    # --- payload schemas ------------------------------------------------
+
+    GameCreatedPayload:
+      type: object
+      properties:
+        joinCode: {type: string}
+        hostUserId: {type: string}
+
+    PlayerJoinedPayload:
+      type: object
+      properties:
+        playerId: {type: string}
+        displayName: {type: string}
+        seat: {type: integer, format: int32}
+
+    GameStartedPayload:
+      type: object
+      properties:
+        playerCount: {type: integer, format: int32}
+        initialPresidentSeat: {type: integer, format: int32}
+
+    TeammateInfo:
+      type: object
+      properties:
+        playerId: {type: string}
+        displayName: {type: string}
+        role: {$ref: '#/components/schemas/Role'}
+
+    RoleAssignedPayload:
+      description: Whispered privately to each player at game start.
+      type: object
+      properties:
+        role: {$ref: '#/components/schemas/Role'}
+        party: {$ref: '#/components/schemas/Party'}
+        teammates:
+          type: array
+          items: {$ref: '#/components/schemas/TeammateInfo'}
+
+    ChancellorNominatedPayload:
+      type: object
+      properties:
+        presidentPlayerId: {type: string}
+        chancellorPlayerId: {type: string}
+        governmentId: {type: string}
+        deadline:
+          type: string
+          format: date-time
+          description: When voting auto-resolves (RFC3339).
+
+    VoteCastPayload:
+      description: |
+        Signals a player has voted. The actual choice is withheld until
+        the election resolves, so clients can render vote progress
+        without spoilers.
+      type: object
+      properties:
+        governmentId: {type: string}
+        playerId: {type: string}
+
+    ElectionResultPayload:
+      type: object
+      properties:
+        governmentId: {type: string}
+        passed: {type: boolean}
+        jaVotes: {type: integer, format: int32}
+        neinVotes: {type: integer, format: int32}
+        votes:
+          type: object
+          additionalProperties: {$ref: '#/components/schemas/VoteChoice'}
+          description: Map from playerId to their vote.
+        reason: {$ref: '#/components/schemas/ProgressReason'}
+
+    PoliciesDrawnPayload:
+      description: Whispered to the president after a successful election.
+      type: object
+      properties:
+        governmentId: {type: string}
+        policies:
+          type: array
+          items: {$ref: '#/components/schemas/PolicyType'}
+          minItems: 3
+          maxItems: 3
+
+    PresidentDiscardedPayload:
+      description: |
+        Broadcast version omits `options`; whispered version to the
+        chancellor includes the two remaining policies.
+      type: object
+      properties:
+        governmentId: {type: string}
+        options:
+          type: array
+          items: {$ref: '#/components/schemas/PolicyType'}
+          maxItems: 2
+
+    ChancellorEnactedPayload:
+      type: object
+      properties:
+        governmentId: {type: string}
+        policy: {$ref: '#/components/schemas/PolicyType'}
+        liberalPoliciesEnacted: {type: integer, format: int32}
+        fascistPoliciesEnacted: {type: integer, format: int32}
+
+    VetoProposedPayload:
+      type: object
+      properties:
+        governmentId: {type: string}
+
+    VetoResolvedPayload:
+      type: object
+      properties:
+        governmentId: {type: string}
+        accepted: {type: boolean}
+
+    ExecutiveActionPayload:
+      type: object
+      properties:
+        actionId: {type: string}
+        type: {$ref: '#/components/schemas/ExecutiveActionType'}
+        presidentPlayerId: {type: string}
+        targetPlayerId: {type: string}
+
+    InvestigateResultPayload:
+      description: Whispered to the president after Investigate Loyalty.
+      type: object
+      properties:
+        actionId: {type: string}
+        targetPlayerId: {type: string}
+        party: {$ref: '#/components/schemas/Party'}
+
+    PolicyPeekPayload:
+      description: Whispered to the president after Policy Peek.
+      type: object
+      properties:
+        actionId: {type: string}
+        policies:
+          type: array
+          items: {$ref: '#/components/schemas/PolicyType'}
+          minItems: 3
+          maxItems: 3
+
+    ElectionTrackerPayload:
+      type: object
+      properties:
+        tracker: {type: integer, minimum: 0, maximum: 3}
+
+    TopDeckPayload:
+      type: object
+      properties:
+        policy: {$ref: '#/components/schemas/PolicyType'}
+        liberalPoliciesEnacted: {type: integer, format: int32}
+        fascistPoliciesEnacted: {type: integer, format: int32}
+
+    DeckReshuffledPayload:
+      type: object
+      properties:
+        remainingInDraw: {type: integer, format: int32}
+
+    PlayerExecutedPayload:
+      type: object
+      properties:
+        playerId: {type: string}
+        wasHitler: {type: boolean}
+        executedBySeat: {type: integer, format: int32}
+
+    GameEndedPayload:
+      type: object
+      properties:
+        winner: {$ref: '#/components/schemas/Party'}
+        winCondition: {$ref: '#/components/schemas/WinCondition'}
+
+    PhaseChangedPayload:
+      type: object
+      properties:
+        from: {$ref: '#/components/schemas/GamePhase'}
+        to: {$ref: '#/components/schemas/GamePhase'}
+        reason: {$ref: '#/components/schemas/ProgressReason'}
+        deadline:
+          type: string
+          format: date-time
+          nullable: true
+
+    # --- request bodies ---------------------------------------------------
+
+    CreateGameRequest:
+      type: object
+      required: [joinCode, displayName]
+      properties:
+        joinCode:
+          type: string
+          example: ABCDE
+          description: Short code players type to join (uppercased server-side).
+        displayName:
+          type: string
+
+    JoinGameRequest:
+      type: object
+      required: [joinCode, displayName]
+      properties:
+        joinCode: {type: string}
+        displayName: {type: string}
+
+    NominateRequest:
+      type: object
+      required: [chancellorPlayerId]
+      properties:
+        chancellorPlayerId: {type: string}
+
+    VoteRequest:
+      type: object
+      required: [choice]
+      properties:
+        choice: {$ref: '#/components/schemas/VoteChoice'}
+
+    DiscardRequest:
+      type: object
+      required: [index]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+          maximum: 2
+
+    EnactRequest:
+      type: object
+      required: [index]
+      properties:
+        index:
+          type: integer
+          minimum: 0
+          maximum: 1
+
+    ResolveVetoRequest:
+      type: object
+      required: [accepted]
+      properties:
+        accepted: {type: boolean}
+
+    ExecuteActionRequest:
+      type: object
+      required: [targetPlayerId]
+      properties:
+        targetPlayerId: {type: string}
+
+    # --- response bodies --------------------------------------------------
+
+    GameAndPlayer:
+      type: object
+      properties:
+        game: {$ref: '#/components/schemas/Game'}
+        player: {$ref: '#/components/schemas/Player'}
+
+    GameSnapshot:
+      type: object
+      properties:
+        game: {$ref: '#/components/schemas/Game'}
+        players:
+          type: array
+          items: {$ref: '#/components/schemas/Player'}
+
+    GovernmentResponse:
+      type: object
+      properties:
+        government: {$ref: '#/components/schemas/Government'}
+
+    StatusResponse:
+      type: object
+      properties:
+        status: {type: string}
+
+    GameResponse:
+      type: object
+      properties:
+        game: {$ref: '#/components/schemas/Game'}
+
+  # -------------------------------------------------------------------------
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Forbidden:
+      description: Authenticated but not allowed (wrong role for this action).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: Game or player not found.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Conflict:
+      description: Engine rejected the action (wrong phase, ineligible, already voted, etc.).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    BadRequest:
+      description: Malformed request body or invalid field.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      security: []
+      tags: [meta]
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema: {type: string, example: ok}
+
+  /games:
+    post:
+      summary: Create a new lobby (host)
+      description: |
+        Creates a new game in the lobby phase. The authenticated user
+        becomes the host and is seated at seat 0.
+      tags: [lobby]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateGameRequest'}
+      responses:
+        '201':
+          description: Game created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GameAndPlayer'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/join:
+    post:
+      summary: Join a lobby by code
+      description: |
+        Seats the authenticated user in the lobby matching the join code.
+        Idempotent: rejoining with the same user returns the existing
+        player record.
+      tags: [lobby]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/JoinGameRequest'}
+      responses:
+        '200':
+          description: Joined.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GameAndPlayer'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/{gameId}:
+    get:
+      summary: Get game snapshot
+      description: |
+        Returns the current game state and seated players. Player `role`
+        and `party` are scrubbed while the game is in progress.
+      tags: [lobby]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Snapshot.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GameSnapshot'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  # --- host actions -------------------------------------------------------
+
+  /games/{gameId}/host/start:
+    post:
+      summary: Start the match (host only)
+      description: |
+        Transitions a lobby into an in-progress match. Deals roles,
+        shuffles the deck, randomly chooses the starting president.
+      tags: [host]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Started.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GameResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/{gameId}/host/force-progress:
+    post:
+      summary: Host force-advances the current phase
+      description: |
+        Bypasses the phase deadline. Per-phase defaults:
+        * `nomination`: skip, advance tracker, rotate president.
+        * `election`: resolve with current votes (missing = nein).
+        * `legislative_*`: auto-pick first policy.
+        * `veto_requested`: reject veto.
+        * `executive_action`: auto-pick first eligible target.
+      tags: [host]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '202':
+          description: Advancing.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/{gameId}/host/timer-tick:
+    post:
+      summary: Scheduler timer expiry
+      description: |
+        Called by the scheduler once the current phase's deadline
+        passes. Refuses (409) if the deadline is still in the future.
+      tags: [host]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '202':
+          description: Advancing.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '409':
+          description: Deadline not reached.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+
+  # --- player actions -----------------------------------------------------
+
+  /games/{gameId}/player/nominate:
+    post:
+      summary: President nominates a chancellor
+      description: |
+        Only the current president may call this. Validates term limits
+        (previous president/chancellor ineligible; previous-president
+        restriction relaxed when only 5 players are alive).
+      tags: [player]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NominateRequest'}
+      responses:
+        '200':
+          description: Nominated.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GovernmentResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/{gameId}/player/vote:
+    post:
+      summary: Cast a ja/nein vote
+      description: |
+        Any alive player may vote. When every alive player has voted
+        the engine resolves the election immediately with
+        `reason: all_voted`.
+      tags: [player]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VoteRequest'}
+      responses:
+        '202':
+          description: Vote recorded.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/{gameId}/player/discard:
+    post:
+      summary: President discards one of the three drawn policies
+      tags: [player]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DiscardRequest'}
+      responses:
+        '202':
+          description: Discarded.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/{gameId}/player/enact:
+    post:
+      summary: Chancellor enacts one of the two remaining policies
+      tags: [player]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EnactRequest'}
+      responses:
+        '202':
+          description: Enacted.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/{gameId}/player/veto:
+    post:
+      summary: Chancellor proposes a veto
+      description: Only allowed once 5 fascist policies are enacted.
+      tags: [player]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '202':
+          description: Veto proposed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/{gameId}/player/veto/resolve:
+    post:
+      summary: President accepts or rejects the veto
+      tags: [player]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ResolveVetoRequest'}
+      responses:
+        '202':
+          description: Veto resolved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  /games/{gameId}/player/action:
+    post:
+      summary: President uses an executive power
+      description: |
+        Target is required for investigate / special election /
+        execution; ignored for policy peek (which resolves immediately
+        on entry). Executing Hitler ends the game with a liberal win.
+      tags: [player]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ExecuteActionRequest'}
+      responses:
+        '202':
+          description: Action executed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusResponse'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+
+  # --- streams ------------------------------------------------------------
+
+  /games/{gameId}/stream/board:
+    get:
+      summary: SSE stream for the host's board device
+      description: |
+        Server-Sent Events. Only the host may subscribe. Emits every
+        broadcast envelope for the game; whispers are never sent to
+        the board.
+
+        Frame format:
+
+        ```
+        id: <subId>-<seq>
+        event: <eventType>
+        data: <JSON Envelope>
+        ```
+
+        The connection stays open until the client disconnects or the
+        server shuts down.
+      tags: [stream]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Event stream.
+          content:
+            text/event-stream:
+              schema: {$ref: '#/components/schemas/Envelope'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+  /games/{gameId}/stream/player:
+    get:
+      summary: SSE stream for a player device
+      description: |
+        Server-Sent Events. Caller must be seated in the game. Emits
+        every broadcast plus whispers addressed to the caller's
+        player record (private role, drawn policies, investigation
+        results, policy peek).
+      tags: [stream]
+      parameters:
+        - $ref: '#/components/parameters/GameIdPath'
+      responses:
+        '200':
+          description: Event stream.
+          content:
+            text/event-stream:
+              schema: {$ref: '#/components/schemas/Envelope'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+
+tags:
+  - name: meta
+    description: Health checks and introspection.
+  - name: lobby
+    description: Game creation, joining, and snapshots.
+  - name: host
+    description: Host-only lifecycle actions (board device).
+  - name: player
+    description: Per-role player actions (phone devices).
+  - name: stream
+    description: Server-Sent Events for live sync.
