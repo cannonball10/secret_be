@@ -69,6 +69,18 @@ type Game struct {
 	Winner       secrethitler.Party        `json:"winner,omitempty"`
 	WinCondition secrethitler.WinCondition `json:"winCondition,omitempty"`
 
+	// PhaseDeadline is when the current phase will auto-advance if nothing
+	// else triggers progression. The scheduler compares against this when
+	// processing a timer tick; the host can force-progress to bypass it.
+	PhaseDeadline *time.Time `json:"phaseDeadline,omitempty"`
+
+	// PendingActionType records the executive action the president must
+	// perform when Phase == PhaseExecutiveAction.
+	PendingActionType secrethitler.ExecutiveActionType `json:"pendingActionType,omitempty"`
+	// PendingActionID references the ExecutiveAction record created when
+	// the phase was entered.
+	PendingActionID string `json:"pendingActionId,omitempty"`
+
 	// Lifecycle timestamps.
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	EndedAt   *time.Time `json:"endedAt,omitempty"`
