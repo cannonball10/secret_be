@@ -1,0 +1,103 @@
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit
+    ports:
+      - "127.0.0.1:7880:7880"
+      - "127.0.0.1:7881:7881"
+    environment:
+      - "LIVEKIT_KEYS=key: secret"
+    command: --dev
+    networks:
+      - foundation-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - foundation-network
+
+  dynamodb:
+    image: amazon/dynamodb-local
+    container_name: dynamodb-local
+    command: "-jar DynamoDBLocal.jar -sharedDb"
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin
+    container_name: dynamodb-admin
+    environment:
+      - DYNAMO_ENDPOINT=http://dynamodb:8000
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+      - AWS_REGION=us-east-1
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      - dynamodb
+      - redis
+
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j
+    ports:
+      - "127.0.0.1:7687:7687"
+      - "127.0.0.1:7474:7474"
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - foundation-network
+    environment:
+      - NEO4J_AUTH=neo4j/password
+    depends_on:
+      - redis
+      - dynamodb
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant_data:/data
+    networks:
+      - foundation-network
+    environment:
+      - QDRANT_API_KEY=some-key
+    depends_on:
+      - redis
+      - dynamodb
+
+  timescale:
+    image: timescale/timescaledb:latest-pg16
+    container_name: timescale
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    networks:
+      - foundation-network
+    environment:
+      - POSTGRES_USER=foundation
+      - POSTGRES_PASSWORD=foundation
+      - POSTGRES_DB=foundation
+
+networks:
+  foundation-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
+  neo4j_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  timescale_data:
+    driver: local
