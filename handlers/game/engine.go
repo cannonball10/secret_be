@@ -100,13 +100,41 @@ func (h *GameHandler) loadVotesForGovernment(ctx context.Context, gameID, govern
 	return votes, nil
 }
 
+// progressReasonKey is the private context key under which the advance
+// path stashes its ProgressReason (timeout / forced / all_voted) so
+// downstream setPhase calls can emit it instead of the default
+// ReasonAction.
+type progressReasonKey struct{}
+
+// ctxWithReason returns ctx carrying the given progression reason.
+func ctxWithReason(ctx context.Context, reason ProgressReason) context.Context {
+	return context.WithValue(ctx, progressReasonKey{}, reason)
+}
+
+// reasonFromCtx returns the stashed progression reason or fallback.
+func reasonFromCtx(ctx context.Context, fallback ProgressReason) ProgressReason {
+	if v := ctx.Value(progressReasonKey{}); v != nil {
+		if r, ok := v.(ProgressReason); ok {
+			return r
+		}
+	}
+	return fallback
+}
+
 // setPhase updates the game phase, emits a PhaseChanged event, and sets
 // a new deadline. Returns the created GameEvent so callers can chain
-// typed payload emissions.
+// typed payload emissions. If the context carries a ProgressReason
+// (e.g. the request entered via ForceProgress or TimerExpired) that
+// reason takes precedence, so every phase transition caused by a
+// forced or timed-out advance stays labelled correctly even when the
+// downstream helper (ChancellorEnact, ResolveVeto, etc.) passes
+// ReasonAction internally.
 func (h *GameHandler) setPhase(ctx context.Context, g *models.Game, to secrethitler.GamePhase, reason ProgressReason) *models.GameEvent {
 	from := g.Phase
 	g.Phase = to
 	g.PhaseDeadline = h.deadlineFor(to)
+
+	reason = reasonFromCtx(ctx, reason)
 
 	ev := models.NewGameEvent(g.GameID /*type*/, eventTypeForPhase(to) /*actor*/, "")
 	deadlineStr := ""

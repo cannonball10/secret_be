@@ -54,6 +54,10 @@ func (h *GameHandler) advance(ctx context.Context, game *models.Game, reason Pro
 	if game.Status != secrethitler.GameStatusInProgress {
 		return fmt.Errorf("%w: game is not in progress", ErrInvalidTransition)
 	}
+	// Stash the reason so downstream setPhase calls can label their
+	// emitted phase-change events (even when they're reached via
+	// helpers like ChancellorEnact that don't take a reason argument).
+	ctx = ctxWithReason(ctx, reason)
 	players, err := h.loadPlayers(ctx, game.GameID)
 	if err != nil {
 		return err

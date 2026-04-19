@@ -135,12 +135,12 @@ func (h *GameHandler) resolveElection(ctx context.Context, game *models.Game, pl
 
 // onElectionPassed handles the "government elected" path: check Hitler
 // chancellor win, else deal policies to the president and transition.
+//
+// Note: the election tracker is NOT reset here. Per the rulebook the
+// tracker only resets when a government actually enacts a policy — an
+// elected-then-vetoed agenda leaves the tracker intact. The reset
+// therefore lives in applyEnactedPolicy.
 func (h *GameHandler) onElectionPassed(ctx context.Context, game *models.Game, gov *models.Government, players []*models.Player) (*models.Government, bool, error) {
-	// Reset election tracker on any successful election.
-	if game.ElectionTracker != 0 {
-		game.ElectionTracker = 0
-	}
-
 	// Hitler-chancellor win condition.
 	chancellor := findPlayerBySeat(players, *gov.ChancellorSeat)
 	if chancellor != nil && chancellor.IsHitler() && game.HitlerZoneActive() {

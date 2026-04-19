@@ -131,6 +131,9 @@ func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game,
 	if game.FascistPoliciesEnacted >= secrethitler.VetoUnlockThreshold {
 		game.VetoUnlocked = true
 	}
+	// A successfully enacted policy (by government or by top-deck) clears
+	// the election tracker per rulebook.
+	game.ElectionTracker = 0
 
 	sequence := game.LiberalPoliciesEnacted + game.FascistPoliciesEnacted
 	governmentID := ""
