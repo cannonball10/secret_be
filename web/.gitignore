@@ -4,6 +4,12 @@ dist/
 *.tsbuildinfo
 .DS_Store
 
+# Local env overrides. .env.example stays committed; anything the
+# developer actually fills in should not.
+.env
+.env.local
+.env.*.local
+
 # Emitted JS from earlier tsc runs — tsconfig now has noEmit: true, but
 # if anyone flips it we don't want the stray files in source control.
 src/**/*.js
