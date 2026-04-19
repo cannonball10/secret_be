@@ -180,16 +180,16 @@ func (h *GameHandler) onElectionFailed(ctx context.Context, game *models.Game, p
 
 	if game.ElectionTracker >= secrethitler.ElectionTrackerLimit {
 		// Top-deck: enact the top policy, clear term limits, reset tracker.
+		// topDeck → applyEnactedPolicy already rotates the presidency
+		// and sets the next phase, so we return here without another
+		// rotation.
 		game.ElectionTracker = 0
 		game.PreviousPresidentSeat = nil
 		game.PreviousChancellorSeat = nil
 		if err := h.topDeck(ctx, game); err != nil {
 			return nil, false, err
 		}
-		// If top-deck didn't end the game, continue to next round.
-		if game.Status == secrethitler.GameStatusCompleted {
-			return nil, false, nil
-		}
+		return nil, false, nil
 	}
 
 	h.rotatePresident(game, players)

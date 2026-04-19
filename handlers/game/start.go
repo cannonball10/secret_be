@@ -199,39 +199,47 @@ func (h *GameHandler) dealRoles(ctx context.Context, game *models.Game, players 
 		p.AssignRole(roles[i])
 	}
 
-	// In 5-6 player games Hitler sees the other fascist; in 7+ Hitler
-	// sees nothing. Fascists always see each other and Hitler.
-	fascistView := make([]TeammateInfo, 0)
-	var hitler *models.Player
-	for _, p := range players {
-		switch p.Role {
-		case secrethitler.RoleFascist, secrethitler.RoleHitler:
-			fascistView = append(fascistView, TeammateInfo{
-				PlayerID: p.PlayerID, DisplayName: p.DisplayName, Role: p.Role,
-			})
-		}
-		if p.IsHitler() {
-			hitler = p
-		}
-	}
-
 	// Broadcast the "roles assigned" event so clients know to prompt
 	// each player for their private reveal.
 	h.broadcast(ctx, models.NewGameEvent(game.GameID, secrethitler.EventRolesAssigned, ""), nil)
 
-	// Whisper to each player.
+	// Whisper to each player their private view. The team reveals:
+	//
+	//   Fascists    : always see every other fascist and Hitler.
+	//   Hitler      : in 5-6 player games, sees the single fascist.
+	//                 In 7+ player games, sees nothing.
+	//   Liberals    : see nothing.
 	for _, p := range players {
 		payload := RoleAssignedPayload{Role: p.Role, Party: p.Party}
 		switch p.Role {
 		case secrethitler.RoleFascist:
-			payload.Teammates = fascistView
+			payload.Teammates = cabalViewExcluding(players, p.PlayerID)
 		case secrethitler.RoleHitler:
-			if len(players) <= 6 && hitler != nil {
-				payload.Teammates = fascistView
+			if len(players) <= 6 {
+				payload.Teammates = cabalViewExcluding(players, p.PlayerID)
 			}
 		}
 		ev := models.NewGameEvent(game.GameID, secrethitler.EventRolesAssigned, p.PlayerID)
 		h.whisper(ctx, ev, p.PlayerID, payload)
 	}
 	return nil
+}
+
+// cabalViewExcluding returns the list of fascist-aligned players (fascists
+// and Hitler) excluding the player whose private view we're building.
+func cabalViewExcluding(players []*models.Player, selfPlayerID string) []TeammateInfo {
+	out := make([]TeammateInfo, 0)
+	for _, p := range players {
+		if p.PlayerID == selfPlayerID {
+			continue
+		}
+		if p.Role == secrethitler.RoleFascist || p.Role == secrethitler.RoleHitler {
+			out = append(out, TeammateInfo{
+				PlayerID:    p.PlayerID,
+				DisplayName: p.DisplayName,
+				Role:        p.Role,
+			})
+		}
+	}
+	return out
 }
