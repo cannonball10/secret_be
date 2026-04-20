@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { RPStamp, RPTimer, RPTVChrome } from "@replicant/ui";
 import { rpColors } from "@replicant/tokens";
+import { powerFor, powerLabel } from "@replicant/schema";
 import type {
   CableLeakedPayload,
   ChancellorNominatedPayload,
@@ -277,6 +278,9 @@ export default function HostGamePage() {
                 ...prev,
                 humanPoliciesEnacted: p.humanPoliciesEnacted ?? prev.humanPoliciesEnacted,
                 aiPoliciesEnacted: p.aiPoliciesEnacted ?? prev.aiPoliciesEnacted,
+                // Enacting a policy clears the tracker — rulebook says
+                // only an *enacted* government resets; vetoed ones don't.
+                electionTracker: 0,
               }
             : prev,
         );
@@ -291,8 +295,18 @@ export default function HostGamePage() {
                 ...prev,
                 humanPoliciesEnacted: p.humanPoliciesEnacted ?? prev.humanPoliciesEnacted,
                 aiPoliciesEnacted: p.aiPoliciesEnacted ?? prev.aiPoliciesEnacted,
+                // Top-deck resets the tracker per rulebook.
+                electionTracker: 0,
               }
             : prev,
+        );
+      }
+
+      if (type === "election_tracker_advanced") {
+        const p = env.payload as { tracker?: number } | undefined;
+        if (!p) return;
+        setGame((prev) =>
+          prev ? { ...prev, electionTracker: p.tracker ?? prev.electionTracker } : prev,
         );
       }
 
@@ -858,6 +872,16 @@ function PolicyTrack({ game }: { game: Game | null }) {
   const human = game?.humanPoliciesEnacted ?? 0;
   const ai = game?.aiPoliciesEnacted ?? 0;
   const tracker = game?.electionTracker ?? 0;
+
+  // Preview the power the president will gain if the NEXT AI policy
+  // is enacted. playerCount is captured at StartGame; powerFor is
+  // 1-indexed over AI policies. If no power, the strip reads "—".
+  const nextAIPolicy = ai + 1;
+  const upcomingPower = game?.playerCount
+    ? powerFor(game.playerCount, nextAIPolicy)
+    : null;
+  const upcomingLabel = upcomingPower ? powerLabel(upcomingPower) : "NONE";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div className="t-eyebrow" style={{ color: rpColors.cyan }}>
@@ -867,6 +891,36 @@ function PolicyTrack({ game }: { game: Game | null }) {
         <PolicyBar label="HUMAN" count={human} slots={5} color={rpColors.cyan} />
         <PolicyBar label="AI" count={ai} slots={6} color={rpColors.stampRed} />
       </div>
+      {nextAIPolicy <= 6 && (
+        <div
+          style={{
+            border: `1px solid ${upcomingPower ? rpColors.amber : rpColors.broadcastRule}`,
+            background: upcomingPower ? "rgba(214,158,46,0.07)" : "transparent",
+            padding: "8px 12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: rpColors.inkFaded,
+            letterSpacing: 1.4,
+          }}
+        >
+          <span>
+            NEXT AI POLICY (#{String(nextAIPolicy).padStart(2, "0")})
+          </span>
+          <span
+            style={{
+              color: upcomingPower ? rpColors.amber : rpColors.inkFaded,
+              fontFamily: "var(--font-display)",
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+            }}
+          >
+            ▸ {upcomingLabel}
+          </span>
+        </div>
+      )}
       <div
         style={{
           border: `1px solid ${rpColors.broadcastRule}`,

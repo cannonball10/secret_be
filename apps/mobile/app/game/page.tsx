@@ -105,6 +105,13 @@ export default function MobileGamePage() {
     key: number;
   } | null>(null);
 
+  // Singularity-only: intercepted cable feed, keyed on governmentId.
+  // Arrives once per cable phase as an anonymised list.
+  const [singularityFeed, setSingularityFeed] = useState<
+    Record<string, { body: string; messageId: string; subversionScore?: number }[]>
+  >({});
+  const [singularityFeedOpen, setSingularityFeedOpen] = useState(false);
+
   // Per-phase cable submission buffer. Keyed on governmentId so the
   // "queued" counter resets automatically at the next cable phase.
   const [cables, setCables] = useState<
@@ -381,6 +388,18 @@ export default function MobileGamePage() {
         });
       }
 
+      if (type === "singularity_cable_feed") {
+        const p = env.payload as
+          | {
+              governmentId: string;
+              cables: { messageId: string; body: string; subversionScore?: number }[];
+            }
+          | undefined;
+        if (!p) return;
+        setSingularityFeed((prev) => ({ ...prev, [p.governmentId]: p.cables }));
+        return;
+      }
+
       if (type === "chat_message") {
         const p = env.payload as ChatMessagePayload | undefined;
         if (!p) return;
@@ -593,6 +612,37 @@ export default function MobileGamePage() {
         guard={guard}
         api={api}
       />
+
+      {role === "singularity" && me?.isAlive && game?.status === "in_progress" && Object.keys(singularityFeed).length > 0 && (
+        <button
+          onClick={() => setSingularityFeedOpen(true)}
+          style={{
+            position: "fixed",
+            right: 16,
+            bottom: 110,
+            background: rpColors.amber,
+            color: rpColors.ink,
+            border: `2px solid ${rpColors.amber}`,
+            padding: "10px 14px",
+            fontFamily: "var(--font-display)",
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            boxShadow: "3px 3px 0 rgba(28,26,21,0.35)",
+            cursor: "pointer",
+            zIndex: 20,
+          }}
+        >
+          ◼ INTERCEPT FEED
+        </button>
+      )}
+
+      {singularityFeedOpen && (
+        <SingularityFeedModal
+          feed={singularityFeed}
+          onClose={() => setSingularityFeedOpen(false)}
+        />
+      )}
 
       {me?.isAlive && game?.status === "in_progress" && (
         <button
@@ -1706,6 +1756,124 @@ function targetVerb(t: NonNullable<Game["pendingActionType"]>): string {
     default:
       return "TARGET";
   }
+}
+
+/** Singularity-only modal showing the round-by-round intercepted
+ *  cable feeds. Cables are anonymous — the kingmaker sees content,
+ *  not authors, which is their intel edge. */
+function SingularityFeedModal({
+  feed,
+  onClose,
+}: {
+  feed: Record<string, { body: string; messageId: string; subversionScore?: number }[]>;
+  onClose: () => void;
+}) {
+  const rounds = Object.keys(feed).sort();
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(6, 8, 10, 0.72)",
+        zIndex: 60,
+        display: "flex",
+        alignItems: "flex-end",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: rpColors.paper3,
+          borderTop: `2px solid ${rpColors.amber}`,
+          width: "100%",
+          maxHeight: "82vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "14px 18px",
+            borderBottom: `1px solid ${rpColors.paperLine}`,
+          }}
+        >
+          <div className="t-eyebrow" style={{ color: rpColors.amber, fontSize: 11 }}>
+            ◼ INTERCEPTED TRAFFIC · ANONYMISED
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close intercept feed"
+            style={{
+              background: "transparent",
+              border: "none",
+              fontSize: 22,
+              color: rpColors.ink,
+              cursor: "pointer",
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{ overflowY: "auto", padding: "8px 18px 20px" }}>
+          {rounds.length === 0 ? (
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: rpColors.inkFaded,
+                textAlign: "center",
+                padding: 30,
+              }}
+            >
+              No traffic intercepted yet.
+            </div>
+          ) : (
+            rounds.map((govId, idx) => {
+              const cables = feed[govId] ?? [];
+              return (
+                <div
+                  key={govId}
+                  style={{
+                    borderBottom: `1px dashed ${rpColors.paperLine}`,
+                    padding: "12px 0",
+                  }}
+                >
+                  <div
+                    className="t-eyebrow"
+                    style={{ color: rpColors.inkFaded, marginBottom: 6, fontSize: 10 }}
+                  >
+                    ROUND #{String(idx + 1).padStart(2, "0")} · {cables.length} CABLES
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {cables.map((c) => (
+                      <div
+                        key={c.messageId}
+                        style={{
+                          fontFamily: "var(--font-typewriter)",
+                          fontSize: 14,
+                          color: rpColors.ink,
+                          lineHeight: 1.45,
+                          padding: "6px 10px",
+                          background: rpColors.paper2,
+                          borderLeft: `3px solid ${rpColors.amber}`,
+                        }}
+                      >
+                        {c.body}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** Partition an oldest-first DM history array into per-peer threads.

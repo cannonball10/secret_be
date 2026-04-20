@@ -195,6 +195,23 @@ export const CablePhaseClosedPayload = z.object({
 });
 export type CablePhaseClosedPayload = z.infer<typeof CablePhaseClosedPayload>;
 
+// AnonymousCableFeedEntry — one row of the Singularity intel feed.
+export const AnonymousCableFeedEntry = z.object({
+  messageId: z.string(),
+  body: z.string(),
+  subversionScore: z.number().optional(),
+});
+export type AnonymousCableFeedEntry = z.infer<typeof AnonymousCableFeedEntry>;
+
+// SingularityCableFeedPayload — whispered only to the Singularity
+// player at cable-phase-close. Every cable the round produced,
+// anonymised. No author info.
+export const SingularityCableFeedPayload = z.object({
+  governmentId: z.string(),
+  cables: z.array(AnonymousCableFeedEntry),
+});
+export type SingularityCableFeedPayload = z.infer<typeof SingularityCableFeedPayload>;
+
 // CableLeakedPayload — the narrator's phase-end broadcast. When
 // `silenced` is true the body/author are empty and the paired
 // narrator_speak envelope says the Committee reviewed the traffic

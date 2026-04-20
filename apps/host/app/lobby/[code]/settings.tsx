@@ -250,6 +250,12 @@ function SettingsModal({
                 onChange={(on) => setDraft({ ...draft, anonymousCableLeaks: on })}
               />
               <ToggleRow
+                label="Disable AI narration"
+                hint="When on, the Committee plays silently — no opening, closing, execution eulogy, or cable-leak voiceover. The board still shows text and stamps; only the synthesised voice is skipped."
+                checked={!!draft.disableNarrator}
+                onChange={(on) => setDraft({ ...draft, disableNarrator: on })}
+              />
+              <ToggleRow
                 label="Enable Singularity (3-faction)"
                 hint="6+ players. Adds one kingmaker role — wins alone if they take the Envoy's seat post-codes."
                 checked={!!draft.enableSingularity}

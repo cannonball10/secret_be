@@ -57,8 +57,56 @@ func (h *GameHandler) advanceFromCablePhase(ctx context.Context, game *models.Ga
 		h.broadcast(ctx, nEv, *leak.narratorPayload)
 	}
 
+	// Singularity intel edge: if this game has a Singularity seated
+	// and at least one cable was submitted, whisper the anonymised
+	// feed to them so the kingmaker role can read the round's traffic
+	// without attribution. Only the Singularity player sees this —
+	// regular whispers do not reach other devices.
+	if game.Rules.EnableSingularity && len(leak.allCables) > 0 {
+		if err := h.whisperCableFeedToSingularity(ctx, game, leak.allCables); err != nil {
+			slog.Warn("cable: Singularity whisper failed", "err", err)
+		}
+	}
+
 	h.setPhase(ctx, game, replicant.PhaseElection, reason)
 	return h.saveGame(ctx, game)
+}
+
+// whisperCableFeedToSingularity finds the seated Singularity (if any)
+// and sends them the full anonymised round cable list. No-op when no
+// Singularity is alive.
+func (h *GameHandler) whisperCableFeedToSingularity(
+	ctx context.Context, game *models.Game, cables []*models.ChatMessage,
+) error {
+	players, err := h.loadPlayers(ctx, game.GameID)
+	if err != nil {
+		return err
+	}
+	var sing *models.Player
+	for _, p := range players {
+		if p.IsSingularity() && p.IsAlive {
+			sing = p
+			break
+		}
+	}
+	if sing == nil {
+		return nil
+	}
+	entries := make([]AnonymousCableFeedEntry, 0, len(cables))
+	for _, c := range cables {
+		entries = append(entries, AnonymousCableFeedEntry{
+			MessageID:       c.MessageID,
+			Body:            c.Body,
+			SubversionScore: c.SubversionScore,
+		})
+	}
+	ev := models.NewGameEvent(game.GameID, replicant.EventSingularityCableFeed, "").
+		WithTarget(sing.PlayerID)
+	h.whisper(ctx, ev, sing.PlayerID, SingularityCableFeedPayload{
+		GovernmentID: game.CurrentGovernmentID,
+		Cables:       entries,
+	})
+	return nil
 }
 
 // cableLeakResult bundles every output the cable leak flow produces,
@@ -69,6 +117,9 @@ type cableLeakResult struct {
 	leakedMessageID  string
 	payload          *CableLeakedPayload
 	narratorPayload  *NarratorSpeakPayload
+	// allCables is the full round's submission list, kept for the
+	// Singularity's anonymised feed whisper. nil when no cables fired.
+	allCables []*models.ChatMessage
 }
 
 // runCableLeak is the per-phase business logic: fetch cables, rank
@@ -82,6 +133,10 @@ func (h *GameHandler) runCableLeak(ctx context.Context, game *models.Game) cable
 		// No narrator configured, or no government — nothing to leak.
 		return result
 	}
+	// Host opted out of narration? We still run the ranker, mark the
+	// cable leaked, and fire the cable_leaked envelope so the board
+	// surfaces the leak visually — only the voiceover is skipped.
+	narrate := !game.Rules.DisableNarrator
 
 	cables, err := h.loadCablesForGovernment(ctx, game.GameID, game.CurrentGovernmentID)
 	if err != nil {
@@ -89,6 +144,7 @@ func (h *GameHandler) runCableLeak(ctx context.Context, game *models.Game) cable
 		return result
 	}
 	result.totalSubmissions = len(cables)
+	result.allCables = cables
 	if len(cables) == 0 {
 		return result
 	}
@@ -102,8 +158,10 @@ func (h *GameHandler) runCableLeak(ctx context.Context, game *models.Game) cable
 			GovernmentID: game.CurrentGovernmentID,
 			Silenced:     true,
 		}
-		if np := h.synthesiseLeak(ctx, narrator.Cue{Kind: narrator.CueCableSilence}); np != nil {
-			result.narratorPayload = np
+		if narrate {
+			if np := h.synthesiseLeak(ctx, narrator.Cue{Kind: narrator.CueCableSilence}); np != nil {
+				result.narratorPayload = np
+			}
 		}
 		return result
 	}
@@ -164,19 +222,24 @@ func (h *GameHandler) runCableLeak(ctx context.Context, game *models.Game) cable
 		// author is "unknown" in that case.
 		authorVar = ""
 	}
-	if np := h.synthesiseLeak(ctx, narrator.Cue{
-		Kind: narrator.CueCableLeak,
-		Vars: map[string]string{"author": authorVar, "body": top.Body},
-	}); np != nil {
-		result.narratorPayload = np
+	if narrate {
+		if np := h.synthesiseLeak(ctx, narrator.Cue{
+			Kind: narrator.CueCableLeak,
+			Vars: map[string]string{"author": authorVar, "body": top.Body},
+		}); np != nil {
+			result.narratorPayload = np
+		}
 	}
 	return result
 }
 
-// synthesiseLeak wraps narrator.Speak, returning nil on failure so
-// the caller can just skip the audio envelope. Audio failures never
-// block phase progression.
+// synthesiseLeak wraps narrator.Speak, returning nil on failure or
+// when the host has disabled narration via Rules.DisableNarrator.
+// Audio failures never block phase progression.
 func (h *GameHandler) synthesiseLeak(ctx context.Context, cue narrator.Cue) *NarratorSpeakPayload {
+	// Note: cable.go's caller resolved the leak content already;
+	// we're just gating the *voiceover*. A DisableNarrator game still
+	// shows the leaked cable on the board, it just plays silently.
 	r, err := h.narrator.Speak(ctx, cue)
 	if err != nil {
 		slog.Warn("cable: narrator.Speak failed", "err", err, "cue", cue.Kind)

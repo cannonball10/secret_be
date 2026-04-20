@@ -229,6 +229,22 @@ type CableLeakedPayload struct {
 	SubversionScore float64 `json:"subversionScore,omitempty"`
 }
 
+// SingularityCableFeedPayload is whispered only to the Singularity at
+// cable-phase-close: every cable submitted this round, anonymised.
+// The kingmaker role's intel edge — full chatter, no attribution.
+type SingularityCableFeedPayload struct {
+	GovernmentID string                    `json:"governmentId"`
+	Cables       []AnonymousCableFeedEntry `json:"cables"`
+}
+
+// AnonymousCableFeedEntry is one row of the Singularity feed: message
+// id + body + (optional) subversion score, with no author.
+type AnonymousCableFeedEntry struct {
+	MessageID       string  `json:"messageId"`
+	Body            string  `json:"body"`
+	SubversionScore float64 `json:"subversionScore,omitempty"`
+}
+
 // PhaseChangedPayload is emitted on every phase transition so clients
 // can drive their UI from a single event stream. It pairs nicely with
 // more specific events (e.g. ChancellorNominatedPayload) but stands on

@@ -88,6 +88,13 @@ func (s *Server) handleNarrate(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "host only"})
 		return
 	}
+	// Honour the host's opt-out. The host UI reads the same flag and
+	// greys out SPEAK, but a stale button click or an auto-cue still
+	// hits here — reject cleanly so the voice stays silent.
+	if g.Rules.DisableNarrator {
+		c.JSON(http.StatusConflict, gin.H{"error": "narrator disabled by rules"})
+		return
+	}
 
 	var body narrateReq
 	if err := c.ShouldBindJSON(&body); err != nil {

@@ -80,6 +80,13 @@ type RulesConfig struct {
 	// false, the author is named explicitly, making leaks a direct
 	// outing mechanism rather than a guessing game.
 	AnonymousCableLeaks bool `json:"anonymousCableLeaks"`
+
+	// DisableNarrator, when true, suppresses every narrator_speak
+	// envelope the engine would otherwise fire (openings, closings,
+	// execution eulogies, cable leak announcements). Useful when a
+	// host wants a silent game, or when the Anthropic/ElevenLabs
+	// budget is a concern. Default false.
+	DisableNarrator bool `json:"disableNarrator"`
 }
 
 // PackageMinPlayers and PackageMaxPlayers are absolute bounds that

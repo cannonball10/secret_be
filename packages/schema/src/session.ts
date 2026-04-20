@@ -42,6 +42,7 @@ export const RulesConfig = z.object({
   cablePhaseDurationSec: z.number().optional(),
   cableLeakSilenceChance: z.number().optional(),
   anonymousCableLeaks: z.boolean().optional(),
+  disableNarrator: z.boolean().optional(),
 });
 export type RulesConfig = z.infer<typeof RulesConfig>;
 

@@ -184,4 +184,8 @@ const (
 	EventCablePhaseOpened    EventType = "cable_phase_opened"
 	EventCablePhaseClosed    EventType = "cable_phase_closed"
 	EventCableLeaked         EventType = "cable_leaked"
+	// EventSingularityCableFeed is whispered only to the Singularity
+	// at cable-phase-close: the full round's anonymised cable list
+	// so the kingmaker role has an intel edge to work with.
+	EventSingularityCableFeed EventType = "singularity_cable_feed"
 )

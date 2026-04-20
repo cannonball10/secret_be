@@ -90,6 +90,7 @@ export const EventType = z.enum([
   "cable_phase_opened",
   "cable_phase_closed",
   "cable_leaked",
+  "singularity_cable_feed",
 ]);
 export type EventType = z.infer<typeof EventType>;
 
