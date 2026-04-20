@@ -270,6 +270,27 @@ export default function MobileGamePage() {
                 }
               : prev,
           );
+          // When a phase rotation advances the presidency (typically
+          // `to === "nomination"` between rounds), chancellor_nominated
+          // hasn't fired yet — so presidentPlayerId would stay stuck on
+          // the PRIOR round's president. Resolve it from the new seat
+          // immediately so iAmPresident flips on the new chair's device
+          // and the NominatePanel actually renders.
+          if (typeof p.presidentSeat === "number") {
+            const newPres = Object.values(players).find(
+              (pl) => pl.seat === p.presidentSeat,
+            );
+            if (newPres) setPresidentPlayerId(newPres.playerId);
+          }
+          // Rotating INTO nomination = fresh round. Clear the last
+          // round's chancellor + vote + policy state so the next
+          // nomination/vote/legislative UI starts clean.
+          if (p.to === "nomination") {
+            setChancellorPlayerId(null);
+            setVotedSet({});
+            setDrawnPolicies(null);
+            setChancellorOptions(null);
+          }
         }
       }
 

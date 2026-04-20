@@ -249,6 +249,22 @@ export default function HostGamePage() {
                 }
               : prev,
           );
+          // Keep presidentPlayerId fresh when the presidency rotates
+          // (typically `to === "nomination"` between rounds). Without
+          // this, the "PRES · BOT 4" line on the vote meter + the
+          // nomination memo keep naming the PRIOR round's president.
+          if (typeof p.presidentSeat === "number") {
+            const newPres = Object.values(players).find(
+              (pl) => pl.seat === p.presidentSeat,
+            );
+            if (newPres) setPresidentPlayerId(newPres.playerId);
+          }
+          // New round starting — clear last round's chancellor-name
+          // state so the vote meter doesn't show a stale ENVOY line.
+          if (p.to === "nomination") {
+            setChancellorPlayerId(null);
+            setVotedSet({});
+          }
         }
       }
 
