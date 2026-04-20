@@ -115,8 +115,15 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 
 	rng := NewSeededRNG(cfg.Seed)
 
-	// Top up seats to (Players - HumanSeats). HumanSeats=0 means fill
-	// every chair with a bot and auto-start, the classic demo flow.
+	// Seat bots. botTarget is "how many bots total", NOT "total seats" —
+	// so the loop iterates that many times regardless of how many
+	// humans have already joined. (Previously the loop used
+	// len(existing) as the counter start, which subtracted humans from
+	// the bot count — 1 human + target 6 bots resulted in only 5 bots.)
+	//
+	// Bot seat indices start at len(existing) so they don't collide
+	// with seats humans have already claimed; existing humans stay
+	// seated at whatever seats JoinGame gave them.
 	botTarget := cfg.Players - cfg.HumanSeats
 	if botTarget < 0 {
 		botTarget = 0
@@ -126,11 +133,13 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 		log.Error("loadPlayers failed", "err", err)
 		return
 	}
-	for i := len(existing); i < botTarget; i++ {
-		uid := botUserID(gameID, i)
-		name := fmt.Sprintf("Bot %d", i)
+	startIdx := len(existing)
+	for i := 0; i < botTarget; i++ {
+		idx := startIdx + i
+		uid := botUserID(gameID, idx)
+		name := fmt.Sprintf("Bot %d", idx)
 		if _, _, err := h.JoinGame(ctx, g.JoinCode, uid, name); err != nil {
-			log.Error("JoinGame failed", "i", i, "err", err)
+			log.Error("JoinGame failed", "idx", idx, "err", err)
 			return
 		}
 		// Cascade joins quickly rather than at full StepDelay.
