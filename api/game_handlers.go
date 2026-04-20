@@ -156,6 +156,45 @@ func (s *Server) handleGetGame(c *gin.Context) {
 
 // --- host actions ----------------------------------------------------------
 
+// handleCurrentLeak returns the leaked cable for the game's current
+// government (if any). Lets clients reconstruct the leak banner
+// after a reload / late SSE connect — the cable_leaked envelope is
+// fire-and-forget, so anyone who wasn't subscribed when it fired
+// would otherwise never see it.
+func (s *Server) handleCurrentLeak(c *gin.Context) {
+	gameID := c.Param("gameId")
+	g, err := s.loadGame(c, gameID)
+	if err != nil {
+		return
+	}
+	msg, err := s.engine.LoadLatestLeak(c.Request.Context(), gameID, g.CurrentGovernmentID)
+	if err != nil {
+		writeEngineError(c, err)
+		return
+	}
+	if msg == nil {
+		c.JSON(http.StatusOK, gin.H{"leak": nil})
+		return
+	}
+	// Respect the anonymous-leaks rule: when on, strip author info
+	// from the replayed payload just like advanceFromCablePhase did
+	// when originally broadcasting. Ensures a mid-round reconnect
+	// can't backdoor around the rule.
+	anon := g.Rules.AnonymousCableLeaks
+	payload := game.CableLeakedPayload{
+		GovernmentID:    g.CurrentGovernmentID,
+		Silenced:        false,
+		MessageID:       msg.MessageID,
+		Body:            msg.Body,
+		SubversionScore: msg.SubversionScore,
+	}
+	if !anon {
+		payload.AuthorPlayerID = msg.AuthorPlayerID
+		payload.Author = msg.AuthorDisplayName
+	}
+	c.JSON(http.StatusOK, gin.H{"leak": payload})
+}
+
 func (s *Server) handleStartGame(c *gin.Context) {
 	gameID := c.Param("gameId")
 	g, err := s.engine.StartGame(c.Request.Context(), gameID, userID(c))

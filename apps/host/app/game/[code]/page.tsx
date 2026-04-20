@@ -102,7 +102,22 @@ export default function HostGamePage() {
         } else if (snap.game.status === "completed") {
           setFinalWinner(snap.game.winner ?? null);
           setFinalCondition(snap.game.winCondition ?? null);
-        } else if (
+        }
+
+        // Recover the current round's cable leak if one happened
+        // before this device's SSE stream was subscribed — round 1 is
+        // especially susceptible because the board loads moments
+        // before the sim's first cable phase closes.
+        if (snap.game.status === "in_progress" && snap.game.currentGovernmentId) {
+          try {
+            const res = await api.currentLeak(snap.game.gameId);
+            if (res.leak) setCableLeak(res.leak);
+          } catch {
+            /* non-fatal */
+          }
+        }
+
+        if (
           snap.game.status === "in_progress" &&
           snap.game.round === 1 &&
           snap.game.phase === "nomination" &&
@@ -155,6 +170,16 @@ export default function HostGamePage() {
       if (snap.game.status === "completed") {
         setFinalWinner(snap.game.winner ?? null);
         setFinalCondition(snap.game.winCondition ?? null);
+      }
+      // Recover the current-round leak too — we likely missed the
+      // cable_leaked envelope during the outage.
+      if (snap.game.status === "in_progress" && snap.game.currentGovernmentId) {
+        try {
+          const res = await api.currentLeak(snap.game.gameId);
+          if (res.leak) setCableLeak(res.leak);
+        } catch {
+          /* non-fatal */
+        }
       }
     } catch {
       /* reconcile errors are non-fatal — the stream recovers on its own */

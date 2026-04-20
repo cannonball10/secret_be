@@ -6,7 +6,13 @@
 // screens may have different identities (e.g. anonymous boot vs.
 // a logged-in host).
 
-import type { Game, NarratorSpeakPayload, Player, RulesConfig } from "@replicant/schema";
+import type {
+  CableLeakedPayload,
+  Game,
+  NarratorSpeakPayload,
+  Player,
+  RulesConfig,
+} from "@replicant/schema";
 import { API_ORIGIN } from "./env";
 
 export interface ApiClientOptions {
@@ -34,6 +40,13 @@ export class HostApi {
 
   getGame(gameId: string): Promise<{ game: Game; players: Player[] }> {
     return this.get(`/api/v1/games/${gameId}`);
+  }
+
+  /** Fetch the persisted cable leak for the game's current round.
+   *  Used on boot to recover the leak banner when the SSE stream
+   *  opened after the cable_leaked envelope already fired. */
+  currentLeak(gameId: string): Promise<{ leak: CableLeakedPayload | null }> {
+    return this.get(`/api/v1/games/${gameId}/current-leak`);
   }
 
   startGame(gameId: string): Promise<{ game: Game }> {

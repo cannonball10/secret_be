@@ -267,6 +267,31 @@ func audioDataURL(audio []byte, format audioschema.AudioFormat) string {
 	return "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(audio)
 }
 
+// LoadLatestLeak returns the flagged cable the narrator leaked for a
+// given government, or nil if none (phase not closed yet, no cables
+// submitted, or silence-path rolled). The host boot path calls this
+// to reconstruct the leak banner when the SSE stream wasn't open in
+// time to catch the cable_leaked envelope during round 1.
+//
+// This is strictly public rules state — the cable's body is already
+// a broadcast-audience envelope at phase-end, so re-serving it here
+// leaks nothing new.
+func (h *GameHandler) LoadLatestLeak(ctx context.Context, gameID, govID string) (*models.ChatMessage, error) {
+	if govID == "" {
+		return nil, nil
+	}
+	cables, err := h.loadCablesForGovernment(ctx, gameID, govID)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range cables {
+		if c.Leaked {
+			return c, nil
+		}
+	}
+	return nil, nil
+}
+
 // loadCablesForGovernment queries every ChatMessage row for the given
 // government id. Uses the MSG#{govId}# prefix in the sort key so the
 // cost is O(|cables for this phase|), not a full scan.
