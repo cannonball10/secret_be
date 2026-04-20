@@ -65,6 +65,8 @@ func (s *Server) registerRoutes() {
 	player.POST("/chat", s.handleChatSend)
 	player.POST("/dm", s.handleDMSend)
 	player.GET("/dms", s.handleDMHistory)
+	player.POST("/ask", s.handleRulesAsk)
+	player.GET("/faq", s.handleRulesFAQ)
 
 	// Streams (SSE). Auth middleware applies here too.
 	stream := v1.Group("/games/:gameId/stream")

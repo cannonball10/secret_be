@@ -77,6 +77,16 @@ export class MobileApi {
     return this.get(`/api/v1/games/${gameId}/player/dms`);
   }
 
+  /** Ask the in-game rules helper a natural-language question. */
+  ask(gameId: string, question: string): Promise<{ answer: string; faq: string[] }> {
+    return this.post(`/api/v1/games/${gameId}/player/ask`, { question });
+  }
+
+  /** Fetch the per-player FAQ starter prompts. */
+  faq(gameId: string): Promise<{ faq: string[] }> {
+    return this.get(`/api/v1/games/${gameId}/player/faq`);
+  }
+
   private get<T>(path: string): Promise<T> {
     return this.request<T>("GET", path);
   }

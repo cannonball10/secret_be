@@ -26,6 +26,7 @@ import (
 	"github.com/cannonball10/foundation/connectors/database"
 	"github.com/cannonball10/foundation/handlers/game"
 	"github.com/cannonball10/foundation/handlers/narrator"
+	"github.com/cannonball10/foundation/handlers/rulesbot"
 	"github.com/gin-gonic/gin"
 )
 
@@ -40,6 +41,7 @@ type Server struct {
 	simConfig     game.SimulationConfig
 	narrator      *narrator.Narrator // optional; nil when LLM/TTS creds missing
 	narratorCache *narratorCache
+	rulesbot      *rulesbot.Bot // optional; nil when ANTHROPIC_API_KEY missing
 }
 
 // Options configures a Server.
@@ -82,6 +84,11 @@ type Options struct {
 	// GET /narrator/audio/:cueId. Leave nil to disable the narrator
 	// (host screen will still render a greyed-out SPEAK button).
 	Narrator *narrator.Narrator
+
+	// RulesBot, when set, exposes POST /player/ask — a natural-
+	// language rules-and-roles helper on mobile. Leave nil to
+	// disable (the mobile UI hides the help button).
+	RulesBot *rulesbot.Bot
 }
 
 // NewServer constructs and wires a ready-to-serve Server.
@@ -118,6 +125,7 @@ func NewServer(opts Options) *Server {
 		simConfig:     opts.SimulateConfig,
 		narrator:      opts.Narrator,
 		narratorCache: newNarratorCache(5 * time.Minute),
+		rulesbot:      opts.RulesBot,
 	}
 	s.router.Use(gin.Recovery())
 	if len(opts.AllowedOrigins) > 0 {

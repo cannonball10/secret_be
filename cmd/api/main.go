@@ -30,6 +30,7 @@ import (
 	"github.com/cannonball10/foundation/connectors/tts"
 	"github.com/cannonball10/foundation/handlers/game"
 	"github.com/cannonball10/foundation/handlers/narrator"
+	"github.com/cannonball10/foundation/handlers/rulesbot"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -51,6 +52,7 @@ func main() {
 
 	simulate, simCfg := simulateOpts()
 	narr := buildNarrator(ctx)
+	bot := buildRulesBot(ctx)
 	server := api.NewServer(api.Options{
 		Database:         db,
 		Auth:             auth,
@@ -59,6 +61,7 @@ func main() {
 		SimulateConfig:   simCfg,
 		AllowedOrigins:   parseCSV(os.Getenv("CORS_ALLOWED_ORIGINS")),
 		Narrator:         narr,
+		RulesBot:         bot,
 	})
 
 	addr := ":" + envOr("API_PORT", "8080")
@@ -177,6 +180,25 @@ func buildNarrator(ctx context.Context) *narrator.Narrator {
 	}
 	slog.Info("narrator ready", "model", cfg.Model, "voice", cfg.VoiceID)
 	return narrator.New(infer, ttsConn, cfg)
+}
+
+// buildRulesBot constructs the in-game rules helper if ANTHROPIC_API_KEY
+// is set. The helper answers natural-language rules questions from
+// player phones; no TTS required. Returns nil to disable the feature
+// (the mobile help button hides itself).
+func buildRulesBot(ctx context.Context) *rulesbot.Bot {
+	if os.Getenv("ANTHROPIC_API_KEY") == "" {
+		slog.Info("rulesbot disabled: ANTHROPIC_API_KEY not set")
+		return nil
+	}
+	infer, err := inference.DefaultAnthropicTextInference(ctx)
+	if err != nil {
+		slog.Warn("rulesbot init (anthropic) failed", "err", err)
+		return nil
+	}
+	cfg := rulesbot.Config{Model: envOr("RULESBOT_MODEL", "claude-sonnet-4-6")}
+	slog.Info("rulesbot ready", "model", cfg.Model)
+	return rulesbot.New(infer, cfg)
 }
 
 // parseCSV splits an env value like "http://a.com, http://b.com" into a

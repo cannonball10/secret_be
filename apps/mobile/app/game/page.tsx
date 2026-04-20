@@ -54,6 +54,7 @@ import {
   WaitFor,
 } from "./panels";
 import { DMDrawer } from "./dms";
+import { RulesHelper } from "./rules";
 
 type LoadState = "boot" | "ready" | "error";
 
@@ -111,6 +112,8 @@ export default function MobileGamePage() {
     Record<string, { body: string; messageId: string; subversionScore?: number }[]>
   >({});
   const [singularityFeedOpen, setSingularityFeedOpen] = useState(false);
+
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Per-phase cable submission buffer. Keyed on governmentId so the
   // "queued" counter resets automatically at the next cable phase.
@@ -642,6 +645,35 @@ export default function MobileGamePage() {
           feed={singularityFeed}
           onClose={() => setSingularityFeedOpen(false)}
         />
+      )}
+
+      {me && game && api && (
+        <button
+          onClick={() => setHelpOpen(true)}
+          aria-label="Open Committee help desk"
+          style={{
+            position: "fixed",
+            left: 16,
+            bottom: 56,
+            background: rpColors.paper3,
+            color: rpColors.ink,
+            border: `2px solid ${rpColors.ink}`,
+            padding: "8px 12px",
+            fontFamily: "var(--font-display)",
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            boxShadow: "3px 3px 0 rgba(28,26,21,0.35)",
+            cursor: "pointer",
+            zIndex: 20,
+          }}
+        >
+          ? HELP
+        </button>
+      )}
+
+      {helpOpen && api && game && (
+        <RulesHelper api={api} gameId={game.gameId} onClose={() => setHelpOpen(false)} />
       )}
 
       {me?.isAlive && game?.status === "in_progress" && (

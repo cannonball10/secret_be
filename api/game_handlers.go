@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/cannonball10/foundation/handlers/game"
+	"github.com/cannonball10/foundation/handlers/rulesbot"
 	"github.com/cannonball10/foundation/models"
 	"github.com/cannonball10/foundation/schemas/database"
 	"github.com/cannonball10/foundation/schemas/replicant"
@@ -59,6 +60,10 @@ type chatReq struct {
 type dmReq struct {
 	RecipientPlayerID string `json:"recipientPlayerId" binding:"required"`
 	Body              string `json:"body" binding:"required"`
+}
+
+type askReq struct {
+	Question string `json:"question" binding:"required"`
 }
 
 // updateRulesReq carries a full RulesConfig the host wants stamped
@@ -342,6 +347,78 @@ func (s *Server) handleDMHistory(c *gin.Context) {
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"messages": out})
+}
+
+// handleRulesAsk routes a natural-language rules question to the
+// rulesbot with the asker's own private context (role, country,
+// feature flags). Returns the answer text synchronously — not
+// streamed, because the mobile UI renders it as a single block
+// and the answers are short.
+func (s *Server) handleRulesAsk(c *gin.Context) {
+	if s.rulesbot == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "rules helper not configured",
+		})
+		return
+	}
+	var body askReq
+	if err := c.ShouldBindJSON(&body); err != nil {
+		badRequest(c, err)
+		return
+	}
+	gameID := c.Param("gameId")
+	player, err := s.currentPlayer(c, gameID)
+	if err != nil {
+		return
+	}
+	g, err := s.loadGame(c, gameID)
+	if err != nil {
+		return
+	}
+	who := rulesbot.PlayerContext{
+		DisplayName:       player.DisplayName,
+		Country:           player.CountryName,
+		Role:              string(player.Role),
+		EnableSingularity: g.Rules.EnableSingularity,
+		CablePhaseOn:      g.Rules.CablePhaseMode == "every_round",
+	}
+	answer, err := s.rulesbot.Ask(c.Request.Context(), body.Question, who)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"answer": answer,
+		"faq":    rulesbot.FAQ(who),
+	})
+}
+
+// handleRulesFAQ returns the canned starter prompts alone — useful
+// for the mobile UI to show before the player's first question.
+func (s *Server) handleRulesFAQ(c *gin.Context) {
+	if s.rulesbot == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "rules helper not configured",
+		})
+		return
+	}
+	gameID := c.Param("gameId")
+	player, err := s.currentPlayer(c, gameID)
+	if err != nil {
+		return
+	}
+	g, err := s.loadGame(c, gameID)
+	if err != nil {
+		return
+	}
+	who := rulesbot.PlayerContext{
+		DisplayName:       player.DisplayName,
+		Country:           player.CountryName,
+		Role:              string(player.Role),
+		EnableSingularity: g.Rules.EnableSingularity,
+		CablePhaseOn:      g.Rules.CablePhaseMode == "every_round",
+	}
+	c.JSON(http.StatusOK, gin.H{"faq": rulesbot.FAQ(who)})
 }
 
 func (s *Server) handleDMSend(c *gin.Context) {
