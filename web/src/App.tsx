@@ -599,7 +599,7 @@ function winConditionLabel(c: string): string {
   }
 }
 
-// Mirrors schemas/secrethitler/powers.go:PowerFor (schedule is fixed).
+// Mirrors schemas/replicant/powers.go:PowerFor (schedule is fixed).
 function powerAt(
   playerCount: number,
   slot: number,

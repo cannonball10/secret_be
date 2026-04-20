@@ -91,11 +91,11 @@ export default function HomePage() {
       }}
     >
       <div className="t-eyebrow" style={{ color: "var(--cyan)" }}>
-        ◼ DEPT. OF HUMAN AFFAIRS · FORM R-07
+        ◼ PLANETARY COMMITTEE · ACCORD R-07
       </div>
       <RPWordmark size={120} color="var(--paper-3)" ghost="var(--stamp-red)" />
       <div className="t-memo" style={{ color: "var(--paper-3)", opacity: 0.7, fontSize: 18 }}>
-        A Human Verification Procedure, in Eight Rounds.
+        A Planetary Committee Session, in Eight Rounds.
       </div>
 
       {state === "boot" && (

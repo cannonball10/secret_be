@@ -8,7 +8,7 @@ import (
 
 	"github.com/cannonball10/foundation/models"
 	"github.com/cannonball10/foundation/schemas/database"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // Common engine errors. They're exported so callers (HTTP/WS layer)
@@ -58,13 +58,13 @@ func (h *GameHandler) loadGame(ctx context.Context, gameID string) (*models.Game
 //     legitimate host-authored override.
 func ensureRules(g *models.Game) {
 	if g.Rules.IsZero() {
-		g.Rules = secrethitler.DefaultRules()
+		g.Rules = replicant.DefaultRules()
 		return
 	}
 	// Per-field backfill for partial records. Only fill fields that
 	// would crash the engine if left at zero; leave fields the host
 	// might intentionally set low (e.g. silence chance = 0) alone.
-	d := secrethitler.DefaultRules()
+	d := replicant.DefaultRules()
 	if g.Rules.MinPlayers <= 0 {
 		g.Rules.MinPlayers = d.MinPlayers
 	}
@@ -189,7 +189,7 @@ func reasonFromCtx(ctx context.Context, fallback ProgressReason) ProgressReason 
 // forced or timed-out advance stays labelled correctly even when the
 // downstream helper (ChancellorEnact, ResolveVeto, etc.) passes
 // ReasonAction internally.
-func (h *GameHandler) setPhase(ctx context.Context, g *models.Game, to secrethitler.GamePhase, reason ProgressReason) *models.GameEvent {
+func (h *GameHandler) setPhase(ctx context.Context, g *models.Game, to replicant.GamePhase, reason ProgressReason) *models.GameEvent {
 	from := g.Phase
 	g.Phase = to
 	g.PhaseDeadline = h.deadlineFor(g, to)
@@ -221,14 +221,14 @@ func (h *GameHandler) setPhase(ctx context.Context, g *models.Game, to secrethit
 
 // eventTypeForPhase maps a phase to a representative EventType for the
 // phase-change announcement.
-func eventTypeForPhase(p secrethitler.GamePhase) secrethitler.EventType {
+func eventTypeForPhase(p replicant.GamePhase) replicant.EventType {
 	switch p {
-	case secrethitler.PhaseGameOver:
-		return secrethitler.EventGameEnded
+	case replicant.PhaseGameOver:
+		return replicant.EventGameEnded
 	default:
 		// Generic phase-change events all reuse the election-result
 		// EventType which clients treat as "state changed, re-read".
-		return secrethitler.EventElectionResult
+		return replicant.EventElectionResult
 	}
 }
 
@@ -236,21 +236,21 @@ func eventTypeForPhase(p secrethitler.GamePhase) secrethitler.EventType {
 // Returns nil for phases that do not auto-advance (lobby, game_over).
 // Cable Phase reads its duration from the game's RulesConfig (per-game
 // customisable); all other phases pull from the engine-wide Config.
-func (h *GameHandler) deadlineFor(g *models.Game, p secrethitler.GamePhase) *time.Time {
+func (h *GameHandler) deadlineFor(g *models.Game, p replicant.GamePhase) *time.Time {
 	now := h.clock.Now()
 	var d time.Duration
 	switch p {
-	case secrethitler.PhaseNomination:
+	case replicant.PhaseNomination:
 		d = h.config.NominationTimeout
-	case secrethitler.PhaseCablePhase:
+	case replicant.PhaseCablePhase:
 		d = time.Duration(g.Rules.CablePhaseDurationSec) * time.Second
-	case secrethitler.PhaseElection:
+	case replicant.PhaseElection:
 		d = h.config.ElectionTimeout
-	case secrethitler.PhaseLegislativePresident, secrethitler.PhaseLegislativeChancellor:
+	case replicant.PhaseLegislativePresident, replicant.PhaseLegislativeChancellor:
 		d = h.config.LegislativeTimeout
-	case secrethitler.PhaseExecutiveAction:
+	case replicant.PhaseExecutiveAction:
 		d = h.config.ExecutiveTimeout
-	case secrethitler.PhaseVetoRequested:
+	case replicant.PhaseVetoRequested:
 		d = h.config.VetoTimeout
 	default:
 		return nil
@@ -327,7 +327,7 @@ func indexOfSeat(players []*models.Player, seat int) int {
 
 // mustPhase returns nil if the game is in the expected phase, else
 // ErrNotInPhase wrapped with context.
-func mustPhase(g *models.Game, want secrethitler.GamePhase) error {
+func mustPhase(g *models.Game, want replicant.GamePhase) error {
 	if g.Phase != want {
 		return fmt.Errorf("%w: want %s, got %s", ErrNotInPhase, want, g.Phase)
 	}

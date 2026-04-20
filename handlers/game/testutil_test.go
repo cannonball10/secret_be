@@ -171,16 +171,20 @@ func (c *captureEmitter) envelopesOfType(t string) []Envelope {
 }
 
 // newTestHandler builds a GameHandler wired to an in-memory DB, a
-// capture emitter, a fake clock, and a deterministic RNG.
-func newTestHandler(t *testing.T, seed uint64) (*GameHandler, *memoryDB, *captureEmitter, *FakeClock) {
+// capture emitter, a fake clock, and a deterministic RNG. Any extra
+// Option values are appended after the defaults so tests can swap in
+// a CableNarrator, override Config, etc.
+func newTestHandler(t *testing.T, seed uint64, extra ...Option) (*GameHandler, *memoryDB, *captureEmitter, *FakeClock) {
 	t.Helper()
 	db := newMemoryDB()
 	cap := &captureEmitter{}
 	clock := &FakeClock{Current: mustParseTime("2026-04-18T12:00:00Z")}
 	rng := NewSeededRNG(seed)
-	return NewGameHandler(db,
+	opts := []Option{
 		WithEmitter(cap),
 		WithClock(clock),
 		WithRNG(rng),
-	), db, cap, clock
+	}
+	opts = append(opts, extra...)
+	return NewGameHandler(db, opts...), db, cap, clock
 }

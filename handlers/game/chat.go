@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // ChatChannel names a conversation scope. "ai" is the replicant cabal
@@ -75,7 +75,7 @@ func (h *GameHandler) SendChat(ctx context.Context, gameID, senderPlayerID strin
 	if err != nil {
 		return err
 	}
-	if game.Status == secrethitler.GameStatusLobby || game.Status == secrethitler.GameStatusCompleted {
+	if game.Status == replicant.GameStatusLobby || game.Status == replicant.GameStatusCompleted {
 		return fmt.Errorf("%w: chat unavailable outside active play", ErrInvalidTransition)
 	}
 
@@ -97,7 +97,7 @@ func (h *GameHandler) SendChat(ctx context.Context, gameID, senderPlayerID strin
 	// has something to score, then whisper an ack to the sender so
 	// their compose UI can clear.
 	if channel == ChannelCable {
-		if game.Phase != secrethitler.PhaseCablePhase {
+		if game.Phase != replicant.PhaseCablePhase {
 			return fmt.Errorf("%w: cables only during Cable Phase", ErrInvalidTransition)
 		}
 		msg := models.NewChatMessage(gameID, string(channel), sender.PlayerID, sender.DisplayName, body)
@@ -116,7 +116,7 @@ func (h *GameHandler) SendChat(ctx context.Context, gameID, senderPlayerID strin
 			GovernmentID:      msg.GovernmentID,
 			Ack:               true,
 		}
-		ev := models.NewGameEvent(gameID, secrethitler.EventChatMessage, sender.PlayerID).
+		ev := models.NewGameEvent(gameID, replicant.EventChatMessage, sender.PlayerID).
 			WithTarget(sender.PlayerID)
 		h.whisper(ctx, ev, sender.PlayerID, ack)
 		return nil
@@ -145,7 +145,7 @@ func (h *GameHandler) SendChat(ctx context.Context, gameID, senderPlayerID strin
 		SentAt:            now,
 	}
 	for _, p := range audience {
-		ev := models.NewGameEvent(gameID, secrethitler.EventChatMessage, sender.PlayerID).
+		ev := models.NewGameEvent(gameID, replicant.EventChatMessage, sender.PlayerID).
 			WithTarget(p.PlayerID)
 		h.whisper(ctx, ev, p.PlayerID, payload)
 	}
@@ -163,7 +163,7 @@ func channelAudience(ch ChatChannel, players []*models.Player) []*models.Player 
 			if !p.IsAlive {
 				continue
 			}
-			if p.Role == secrethitler.RoleAI || p.Role == secrethitler.RoleRogue {
+			if p.Role == replicant.RoleAI || p.Role == replicant.RoleRogue {
 				out = append(out, p)
 			}
 		}

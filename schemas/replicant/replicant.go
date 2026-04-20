@@ -1,9 +1,9 @@
-// Package secrethitler defines shared constants for the Secret Hitler game.
-package secrethitler
+// Package replicant defines shared constants for the Replicant game.
+package replicant
 
 // Role is a player's secret role assigned at game start.
 //
-// Naming is retained from the Secret Hitler origin (Human / AI / Rogue)
+// Naming is retained from the Replicant origin (Human / AI / Rogue)
 // even as the Replicant theme renames them in-fiction to Human /
 // Replicant / Prime. A fourth role, Singularity, is only dealt when
 // RulesConfig.EnableSingularity is true — it's a solo kingmaker
@@ -50,7 +50,7 @@ const (
 	PolicyAI PolicyType = "ai"
 )
 
-// Standard deck composition for Secret Hitler.
+// Standard deck composition.
 const (
 	LiberalPoliciesInDeck = 6
 	FascistPoliciesInDeck = 11

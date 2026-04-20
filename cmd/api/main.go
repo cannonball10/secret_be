@@ -1,10 +1,10 @@
-// Command api is a minimal entrypoint for the Secret Hitler backend.
+// Command api is a minimal entrypoint for the Replicant backend.
 // It wires just the DynamoDB connector, picks an authenticator based
 // on the environment, and starts the Gin HTTP server from package api.
 //
 // Intentionally narrow: importing the full `connectors` package pulls
 // in LiveKit (which currently has unresolved dependencies), and the
-// Secret Hitler engine only needs a DatabaseConnector. Add connectors
+// Replicant engine only needs a DatabaseConnector. Add connectors
 // as the game starts using them (Redis pub-sub for the hub, Clerk, …).
 //
 // Run:

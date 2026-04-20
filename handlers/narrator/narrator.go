@@ -3,7 +3,7 @@
 // Flow per Speak(cue):
 //   1. Render the cue's prompt with game-state variables.
 //   2. Call the configured text-inference connector (Claude via the
-//      foundation's Anthropic connector) with a Department-voice
+//      foundation's Anthropic connector) with a Committee-voice
 //      system prompt + few-shot examples.
 //   3. Trim the script and synthesize it with the configured TTS
 //      connector (ElevenLabs).
@@ -45,7 +45,7 @@ const (
 	//   · "author"  — speaker's display name
 	//   · "body"    — the verbatim cable text
 	CueCableLeak CueKind = "cable_leak"
-	// CueCableSilence is what the Department says when no cable from
+	// CueCableSilence is what the Committee says when no cable from
 	// the round meets the subversion bar. Takes no vars.
 	CueCableSilence CueKind = "cable_silence"
 	// CueCustom lets a host type raw text; we skip the LLM and feed
@@ -183,7 +183,7 @@ type Cable struct {
 // "subversion" score in [0, 10] where 10 means "smoking gun" and 0
 // means innocuous small talk. Reason is the ranker's brief
 // justification; the engine ignores it at runtime but it's useful for
-// debugging and for a future "Department's notes" UI.
+// debugging and for a future "Committee's notes" UI.
 type ScoredCable struct {
 	MessageID string  `json:"id"`
 	Score     float64 `json:"score"`

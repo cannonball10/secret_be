@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 func TestMemoryHub_BroadcastReachesAllSubscribers(t *testing.T) {
@@ -16,7 +16,7 @@ func TestMemoryHub_BroadcastReachesAllSubscribers(t *testing.T) {
 
 	env := Envelope{
 		GameID:   "game-1",
-		Event:    models.NewGameEvent("game-1", secrethitler.EventGameStarted, ""),
+		Event:    models.NewGameEvent("game-1", replicant.EventGameStarted, ""),
 		Audience: Audience{Scope: AudienceBroadcast},
 	}
 	h.Publish(context.Background(), env)
@@ -41,7 +41,7 @@ func TestMemoryHub_WhisperOnlyReachesTarget(t *testing.T) {
 
 	env := Envelope{
 		GameID:   "game-1",
-		Event:    models.NewGameEvent("game-1", secrethitler.EventRolesAssigned, ""),
+		Event:    models.NewGameEvent("game-1", replicant.EventRolesAssigned, ""),
 		Audience: Audience{Scope: AudiencePlayer, PlayerID: "player-1"},
 	}
 	h.Publish(context.Background(), env)
@@ -87,7 +87,7 @@ func TestMemoryHub_SlowSubscriberDoesNotBlock(t *testing.T) {
 	// Fill the buffered channel without reading.
 	env := Envelope{
 		GameID:   "game-1",
-		Event:    models.NewGameEvent("game-1", secrethitler.EventVoteCast, ""),
+		Event:    models.NewGameEvent("game-1", replicant.EventVoteCast, ""),
 		Audience: Audience{Scope: AudienceBroadcast},
 	}
 	// Publish more than buffer size; should not deadlock.
@@ -117,13 +117,13 @@ func TestHubEmitter_PublishesThroughHub(t *testing.T) {
 
 	e.Emit(context.Background(), Envelope{
 		GameID:   "game-1",
-		Event:    models.NewGameEvent("game-1", secrethitler.EventGameEnded, ""),
+		Event:    models.NewGameEvent("game-1", replicant.EventGameEnded, ""),
 		Audience: Audience{Scope: AudienceBroadcast},
 	})
 
 	select {
 	case got := <-sub.Send:
-		if got.Event.Type != secrethitler.EventGameEnded {
+		if got.Event.Type != replicant.EventGameEnded {
 			t.Errorf("type = %q", got.Event.Type)
 		}
 	default:

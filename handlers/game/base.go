@@ -1,4 +1,4 @@
-// Package game implements the Secret Hitler game state machine. A
+// Package game implements the Replicant game state machine. A
 // GameHandler owns the rules for every transition; every method is the
 // single authoritative way to change game state and always emits one or
 // more events so connected devices can re-render.

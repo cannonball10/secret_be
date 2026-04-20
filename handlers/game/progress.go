@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // ForceProgress is invoked by the host to manually advance the phase
@@ -51,7 +51,7 @@ func (h *GameHandler) TimerExpired(ctx context.Context, gameID string) error {
 //   - ExecutiveAction         : auto-pick the first eligible target,
 //     or, for policy peek, re-emit the whisper.
 func (h *GameHandler) advance(ctx context.Context, game *models.Game, reason ProgressReason) error {
-	if game.Status != secrethitler.GameStatusInProgress {
+	if game.Status != replicant.GameStatusInProgress {
 		return fmt.Errorf("%w: game is not in progress", ErrInvalidTransition)
 	}
 	// Stash the reason so downstream setPhase calls can label their
@@ -64,15 +64,15 @@ func (h *GameHandler) advance(ctx context.Context, game *models.Game, reason Pro
 	}
 
 	switch game.Phase {
-	case secrethitler.PhaseNomination:
+	case replicant.PhaseNomination:
 		// Skip this president's turn: advance tracker and rotate.
 		_, _, err := h.onElectionFailed(ctx, game, players, reason)
 		return err
 
-	case secrethitler.PhaseCablePhase:
+	case replicant.PhaseCablePhase:
 		return h.advanceFromCablePhase(ctx, game, reason)
 
-	case secrethitler.PhaseElection:
+	case replicant.PhaseElection:
 		votes, err := h.loadVotesForGovernment(ctx, game.GameID, game.CurrentGovernmentID)
 		if err != nil {
 			return err
@@ -80,7 +80,7 @@ func (h *GameHandler) advance(ctx context.Context, game *models.Game, reason Pro
 		_, _, err = h.resolveElection(ctx, game, players, votes, reason)
 		return err
 
-	case secrethitler.PhaseLegislativePresident:
+	case replicant.PhaseLegislativePresident:
 		president := findPlayerBySeat(players, game.PresidentSeat)
 		if president == nil {
 			return ErrPlayerNotFound
@@ -88,7 +88,7 @@ func (h *GameHandler) advance(ctx context.Context, game *models.Game, reason Pro
 		// Default: discard the first drawn policy.
 		return h.PresidentDiscard(ctx, game.GameID, president.PlayerID, 0)
 
-	case secrethitler.PhaseLegislativeChancellor:
+	case replicant.PhaseLegislativeChancellor:
 		if game.ChancellorSeat == nil {
 			return ErrInvalidTransition
 		}
@@ -98,17 +98,17 @@ func (h *GameHandler) advance(ctx context.Context, game *models.Game, reason Pro
 		}
 		return h.ChancellorEnact(ctx, game.GameID, chancellor.PlayerID, 0)
 
-	case secrethitler.PhaseVetoRequested:
+	case replicant.PhaseVetoRequested:
 		president := findPlayerBySeat(players, game.PresidentSeat)
 		if president == nil {
 			return ErrPlayerNotFound
 		}
 		return h.ResolveVeto(ctx, game.GameID, president.PlayerID, false)
 
-	case secrethitler.PhaseExecutiveAction:
+	case replicant.PhaseExecutiveAction:
 		return h.autoExecuteAction(ctx, game, players)
 
-	case secrethitler.PhaseLobby, secrethitler.PhaseGameOver:
+	case replicant.PhaseLobby, replicant.PhaseGameOver:
 		return fmt.Errorf("%w: cannot advance from %s", ErrInvalidTransition, game.Phase)
 	}
 	return fmt.Errorf("%w: unknown phase %s", ErrInvalidTransition, game.Phase)
@@ -129,7 +129,7 @@ func (h *GameHandler) autoExecuteAction(ctx context.Context, game *models.Game, 
 		if p.PlayerID == president.PlayerID {
 			continue
 		}
-		if game.PendingActionType == secrethitler.ActionInvestigateLoyalty && seatAlreadyInvestigated(p, president.Seat) {
+		if game.PendingActionType == replicant.ActionInvestigateLoyalty && seatAlreadyInvestigated(p, president.Seat) {
 			continue
 		}
 		target = p
@@ -143,17 +143,17 @@ func (h *GameHandler) autoExecuteAction(ctx context.Context, game *models.Game, 
 }
 
 // endGame transitions the game into GameOver and emits the final event.
-func (h *GameHandler) endGame(ctx context.Context, game *models.Game, winner secrethitler.Party, cond secrethitler.WinCondition) error {
-	game.Status = secrethitler.GameStatusCompleted
+func (h *GameHandler) endGame(ctx context.Context, game *models.Game, winner replicant.Party, cond replicant.WinCondition) error {
+	game.Status = replicant.GameStatusCompleted
 	game.Winner = winner
 	game.WinCondition = cond
 	now := h.clock.Now()
 	game.EndedAt = &now
 	game.PhaseDeadline = nil
 
-	ev := models.NewGameEvent(game.GameID, secrethitler.EventGameEnded, "")
+	ev := models.NewGameEvent(game.GameID, replicant.EventGameEnded, "")
 	h.broadcast(ctx, ev, GameEndedPayload{Winner: winner, WinCondition: cond})
 
-	h.setPhase(ctx, game, secrethitler.PhaseGameOver, ReasonAction)
+	h.setPhase(ctx, game, replicant.PhaseGameOver, ReasonAction)
 	return h.saveGame(ctx, game)
 }

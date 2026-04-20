@@ -8,7 +8,7 @@ import (
 	"github.com/cannonball10/foundation/handlers/game"
 	"github.com/cannonball10/foundation/models"
 	"github.com/cannonball10/foundation/schemas/database"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,7 +32,7 @@ type nominateReq struct {
 }
 
 type voteReq struct {
-	Choice secrethitler.VoteChoice `json:"choice" binding:"required"`
+	Choice replicant.VoteChoice `json:"choice" binding:"required"`
 }
 
 type discardReq struct {
@@ -100,7 +100,7 @@ func (s *Server) handleJoinGame(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	if g.Status != secrethitler.GameStatusCompleted {
+	if g.Status != replicant.GameStatusCompleted {
 		for _, p := range roster {
 			if p.PlayerID == player.PlayerID {
 				continue
@@ -126,7 +126,7 @@ func (s *Server) handleGetGame(c *gin.Context) {
 	// Scrub roles/party unless the caller is the host display or the
 	// game is over. Players get their own role re-sent via the stream
 	// on resume; it's not exposed in this snapshot.
-	if g.Status != secrethitler.GameStatusCompleted {
+	if g.Status != replicant.GameStatusCompleted {
 		for _, p := range players {
 			p.Role = ""
 			p.Party = ""
@@ -197,7 +197,7 @@ func (s *Server) handleCastVote(c *gin.Context) {
 		badRequest(c, err)
 		return
 	}
-	if body.Choice != secrethitler.VoteJa && body.Choice != secrethitler.VoteNein {
+	if body.Choice != replicant.VoteJa && body.Choice != replicant.VoteNein {
 		badRequest(c, errors.New("choice must be ja or nein"))
 		return
 	}

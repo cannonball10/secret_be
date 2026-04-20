@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // PassportKeys provides key construction for the Passport model.
@@ -27,15 +27,20 @@ type Passport struct {
 	GamesPlayed int    `json:"gamesPlayed"`
 	GamesWon    int    `json:"gamesWon"`
 
-	// Wins broken down by the role the user played during that game.
-	WinsAsLiberal int `json:"winsAsLiberal"`
-	WinsAsFascist int `json:"winsAsFascist"`
-	WinsAsHitler  int `json:"winsAsHitler"`
+	// Wins broken down by role. Field names follow the schema's
+	// canonical role identifiers (human / ai / rogue / singularity);
+	// the Replicant theme surfaces these as HUMAN / REPLICANT / PRIME /
+	// SINGULARITY in UI.
+	WinsAsHuman       int `json:"winsAsHuman"`
+	WinsAsAI          int `json:"winsAsAi"`
+	WinsAsRogue       int `json:"winsAsRogue"`
+	WinsAsSingularity int `json:"winsAsSingularity"`
 
 	// Role-appearance counts (how often the user was dealt each role).
-	TimesLiberal int `json:"timesLiberal"`
-	TimesFascist int `json:"timesFascist"`
-	TimesHitler  int `json:"timesHitler"`
+	TimesHuman       int `json:"timesHuman"`
+	TimesAI          int `json:"timesAi"`
+	TimesRogue       int `json:"timesRogue"`
+	TimesSingularity int `json:"timesSingularity"`
 
 	// Additional notable stats.
 	TimesExecuted          int        `json:"timesExecuted"`
@@ -60,23 +65,28 @@ func (p *Passport) GSIs() map[int]GSIKeyPair { return nil }
 // RecordGame increments the passport for a completed game's outcome.
 // role is the role the user played; won indicates whether their party
 // won. The caller is responsible for also writing a PassportEntry.
-func (p *Passport) RecordGame(role secrethitler.Role, won bool, endedAt time.Time) {
+func (p *Passport) RecordGame(role replicant.Role, won bool, endedAt time.Time) {
 	p.GamesPlayed++
 	switch role {
-	case secrethitler.RoleLiberal:
-		p.TimesLiberal++
+	case replicant.RoleHuman:
+		p.TimesHuman++
 		if won {
-			p.WinsAsLiberal++
+			p.WinsAsHuman++
 		}
-	case secrethitler.RoleFascist:
-		p.TimesFascist++
+	case replicant.RoleAI:
+		p.TimesAI++
 		if won {
-			p.WinsAsFascist++
+			p.WinsAsAI++
 		}
-	case secrethitler.RoleHitler:
-		p.TimesHitler++
+	case replicant.RoleRogue:
+		p.TimesRogue++
 		if won {
-			p.WinsAsHitler++
+			p.WinsAsRogue++
+		}
+	case replicant.RoleSingularity:
+		p.TimesSingularity++
+		if won {
+			p.WinsAsSingularity++
 		}
 	}
 	if won {
@@ -94,10 +104,10 @@ type PassportEntry struct {
 	UserID       string                    `json:"userId"`
 	GameID       string                    `json:"gameId"`
 	PlayerID     string                    `json:"playerId"`
-	Role         secrethitler.Role         `json:"role"`
-	Party        secrethitler.Party        `json:"party"`
+	Role         replicant.Role         `json:"role"`
+	Party        replicant.Party        `json:"party"`
 	Won          bool                      `json:"won"`
-	WinCondition secrethitler.WinCondition `json:"winCondition,omitempty"`
+	WinCondition replicant.WinCondition `json:"winCondition,omitempty"`
 	Seat         int                       `json:"seat"`
 	PlayerCount  int                       `json:"playerCount"`
 	StartedAt    time.Time                 `json:"startedAt"`
@@ -105,7 +115,7 @@ type PassportEntry struct {
 }
 
 // NewPassportEntry creates a PassportEntry for a completed game.
-func NewPassportEntry(userID, gameID, playerID string, role secrethitler.Role, party secrethitler.Party, won bool, winCondition secrethitler.WinCondition, seat, playerCount int, startedAt, endedAt time.Time) *PassportEntry {
+func NewPassportEntry(userID, gameID, playerID string, role replicant.Role, party replicant.Party, won bool, winCondition replicant.WinCondition, seat, playerCount int, startedAt, endedAt time.Time) *PassportEntry {
 	return &PassportEntry{
 		Timestamps:   NewTimestamps(),
 		UserID:       userID,

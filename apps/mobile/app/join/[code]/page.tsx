@@ -53,7 +53,7 @@ export default function MobileJoinPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <div className="t-eyebrow" style={{ color: "var(--ink-faded)", marginBottom: 6 }}>
-            ◼ INTAKE · FORM R-07
+            ◼ INTAKE · ACCORD R-07
           </div>
           <div
             style={{
@@ -104,7 +104,7 @@ export default function MobileJoinPage() {
           maxLength={32}
           autoComplete="off"
           spellCheck={false}
-          placeholder="How the Department will address you"
+          placeholder="How the Committee will address you"
           style={{
             fontFamily: "var(--font-typewriter)",
             fontSize: 18,
@@ -137,7 +137,7 @@ export default function MobileJoinPage() {
         disabled={!name.trim() || busy}
         onClick={join}
       >
-        ▸ Register with the Department
+        ▸ Seat with the Committee
       </RPButton>
 
       <button

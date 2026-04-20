@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // enterExecutiveAction creates a pending ExecutiveAction record and
 // advances the phase so the president can act.
-func (h *GameHandler) enterExecutiveAction(ctx context.Context, game *models.Game, gov *models.Government, actionType secrethitler.ExecutiveActionType) error {
+func (h *GameHandler) enterExecutiveAction(ctx context.Context, game *models.Game, gov *models.Government, actionType replicant.ExecutiveActionType) error {
 	action := models.NewExecutiveAction(nil, game.GameID, game.Round, actionType, gov.PresidentPlayerID)
 	if err := h.db.Upsert(ctx, nil, action); err != nil {
 		return err
@@ -18,7 +18,7 @@ func (h *GameHandler) enterExecutiveAction(ctx context.Context, game *models.Gam
 	game.PendingActionType = actionType
 	game.PendingActionID = action.ActionID
 
-	ev := models.NewGameEvent(game.GameID, secrethitler.EventExecutiveAction, gov.PresidentPlayerID)
+	ev := models.NewGameEvent(game.GameID, replicant.EventExecutiveAction, gov.PresidentPlayerID)
 	h.broadcast(ctx, ev, ExecutiveActionPayload{
 		ActionID:          action.ActionID,
 		Type:              actionType,
@@ -27,11 +27,11 @@ func (h *GameHandler) enterExecutiveAction(ctx context.Context, game *models.Gam
 
 	// Policy peek resolves immediately: whisper the top 3 to the
 	// president and auto-advance back to nomination.
-	if actionType == secrethitler.ActionPolicyPeek {
+	if actionType == replicant.ActionPolicyPeek {
 		return h.resolvePolicyPeek(ctx, game, action)
 	}
 
-	h.setPhase(ctx, game, secrethitler.PhaseExecutiveAction, ReasonAction)
+	h.setPhase(ctx, game, replicant.PhaseExecutiveAction, ReasonAction)
 	return h.saveGame(ctx, game)
 }
 
@@ -41,14 +41,14 @@ func (h *GameHandler) resolvePolicyPeek(ctx context.Context, game *models.Game, 
 	if len(game.DrawPile) < 3 {
 		h.reshuffle(ctx, game)
 	}
-	peek := append([]secrethitler.PolicyType(nil), game.DrawPile[:3]...)
+	peek := append([]replicant.PolicyType(nil), game.DrawPile[:3]...)
 	action.PeekedPolicies = peek
 	action.Complete()
 	if err := h.db.Upsert(ctx, nil, action); err != nil {
 		return err
 	}
 
-	ev := models.NewGameEvent(game.GameID, secrethitler.EventExecutiveAction, action.PresidentPlayerID)
+	ev := models.NewGameEvent(game.GameID, replicant.EventExecutiveAction, action.PresidentPlayerID)
 	h.whisper(ctx, ev, action.PresidentPlayerID, PolicyPeekPayload{
 		ActionID: action.ActionID,
 		Policies: peek,
@@ -65,7 +65,7 @@ func (h *GameHandler) ExecuteAction(ctx context.Context, gameID, presidentPlayer
 	if err != nil {
 		return err
 	}
-	if err := mustPhase(game, secrethitler.PhaseExecutiveAction); err != nil {
+	if err := mustPhase(game, replicant.PhaseExecutiveAction); err != nil {
 		return err
 	}
 	players, err := h.loadPlayers(ctx, gameID)
@@ -94,7 +94,7 @@ func (h *GameHandler) ExecuteAction(ctx context.Context, gameID, presidentPlayer
 	action.TargetPlayerID = target.PlayerID
 
 	switch game.PendingActionType {
-	case secrethitler.ActionInvestigateLoyalty:
+	case replicant.ActionInvestigateLoyalty:
 		if seatAlreadyInvestigated(target, president.Seat) {
 			return fmt.Errorf("%w: already investigated this player", ErrIneligibleCandidate)
 		}
@@ -103,7 +103,7 @@ func (h *GameHandler) ExecuteAction(ctx context.Context, gameID, presidentPlayer
 		if err := h.db.Upsert(ctx, nil, target); err != nil {
 			return err
 		}
-		h.whisper(ctx, models.NewGameEvent(gameID, secrethitler.EventExecutiveAction, presidentPlayerID).WithTarget(target.PlayerID),
+		h.whisper(ctx, models.NewGameEvent(gameID, replicant.EventExecutiveAction, presidentPlayerID).WithTarget(target.PlayerID),
 			presidentPlayerID,
 			InvestigateResultPayload{
 				ActionID:       action.ActionID,
@@ -111,7 +111,7 @@ func (h *GameHandler) ExecuteAction(ctx context.Context, gameID, presidentPlayer
 				Party:          target.Party,
 			})
 
-	case secrethitler.ActionSpecialElection:
+	case replicant.ActionSpecialElection:
 		// Next nomination will seat the target as president; afterwards
 		// presidency returns to the next seat in normal rotation.
 		returnSeat := nextAliveSeat(players, game.PresidentSeat)
@@ -119,12 +119,12 @@ func (h *GameHandler) ExecuteAction(ctx context.Context, gameID, presidentPlayer
 		game.PresidentSeat = target.Seat
 		game.ChancellorSeat = nil
 
-	case secrethitler.ActionExecution:
+	case replicant.ActionExecution:
 		target.Kill()
 		if err := h.db.Upsert(ctx, nil, target); err != nil {
 			return err
 		}
-		h.broadcast(ctx, models.NewGameEvent(gameID, secrethitler.EventPlayerExecuted, presidentPlayerID).WithTarget(target.PlayerID),
+		h.broadcast(ctx, models.NewGameEvent(gameID, replicant.EventPlayerExecuted, presidentPlayerID).WithTarget(target.PlayerID),
 			PlayerExecutedPayload{
 				PlayerID:       target.PlayerID,
 				WasRogue:      target.IsRogue(),
@@ -135,7 +135,7 @@ func (h *GameHandler) ExecuteAction(ctx context.Context, gameID, presidentPlayer
 			if err := h.db.Upsert(ctx, nil, action); err != nil {
 				return err
 			}
-			return h.endGame(ctx, game, secrethitler.PartyHuman, secrethitler.WinRogueExecuted)
+			return h.endGame(ctx, game, replicant.PartyHuman, replicant.WinRogueExecuted)
 		}
 
 	default:
@@ -170,7 +170,7 @@ func (h *GameHandler) completeExecutiveAction(ctx context.Context, game *models.
 		h.rotatePresident(game, players)
 	}
 
-	h.setPhase(ctx, game, secrethitler.PhaseNomination, ReasonAction)
+	h.setPhase(ctx, game, replicant.PhaseNomination, ReasonAction)
 	return h.saveGame(ctx, game)
 }
 

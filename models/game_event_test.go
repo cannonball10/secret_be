@@ -3,21 +3,21 @@ package models
 import (
 	"testing"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 func TestNewGameEvent(t *testing.T) {
-	e := NewGameEvent("G1", secrethitler.EventGameStarted, "pres")
+	e := NewGameEvent("G1", replicant.EventGameStarted, "pres")
 	if e.EventID == "" {
 		t.Fatal("expected EventID to be generated")
 	}
-	if e.Type != secrethitler.EventGameStarted {
+	if e.Type != replicant.EventGameStarted {
 		t.Errorf("Type = %q", e.Type)
 	}
 }
 
 func TestGameEventKeys(t *testing.T) {
-	e := NewGameEvent("G1", secrethitler.EventVoteCast, "p")
+	e := NewGameEvent("G1", replicant.EventVoteCast, "p")
 	if e.PK() != "GAME#G1" {
 		t.Errorf("PK() = %q", e.PK())
 	}
@@ -27,7 +27,7 @@ func TestGameEventKeys(t *testing.T) {
 }
 
 func TestGameEventBuilders(t *testing.T) {
-	e := NewGameEvent("G1", secrethitler.EventPlayerExecuted, "pres").
+	e := NewGameEvent("G1", replicant.EventPlayerExecuted, "pres").
 		WithTarget("victim").
 		WithData(map[string]any{"reason": "president-power"})
 

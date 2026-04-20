@@ -3,7 +3,7 @@ package models
 import (
 	"testing"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 func TestNewPlayer(t *testing.T) {
@@ -45,21 +45,21 @@ func TestPlayerKeys(t *testing.T) {
 
 func TestPlayer_AssignRole(t *testing.T) {
 	p := NewPlayer(nil, "g", "u", "a", false)
-	p.AssignRole(secrethitler.RoleHitler)
+	p.AssignRole(replicant.RoleRogue)
 
-	if p.Role != secrethitler.RoleHitler {
+	if p.Role != replicant.RoleRogue {
 		t.Errorf("Role = %q", p.Role)
 	}
-	if p.Party != secrethitler.PartyFascist {
-		t.Errorf("Hitler should be in fascist party, got %q", p.Party)
+	if p.Party != replicant.PartyAI {
+		t.Errorf("Rogue should be in AI party, got %q", p.Party)
 	}
-	if !p.IsHitler() {
-		t.Error("IsHitler() should be true")
+	if !p.IsRogue() {
+		t.Error("IsRogue() should be true")
 	}
 
-	p.AssignRole(secrethitler.RoleLiberal)
-	if p.Party != secrethitler.PartyLiberal {
-		t.Errorf("Liberal party expected, got %q", p.Party)
+	p.AssignRole(replicant.RoleHuman)
+	if p.Party != replicant.PartyHuman {
+		t.Errorf("Human party expected, got %q", p.Party)
 	}
 }
 

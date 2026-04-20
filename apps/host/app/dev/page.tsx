@@ -154,9 +154,9 @@ export default function DevPage() {
                 REDACTION
               </div>
               <div className="t-memo" style={{ fontSize: 16, color: rpColors.ink, maxWidth: 720 }}>
-                You are a synthetic citizen, indistinguishable from the rest. Your directive:
-                blend in. <RPRedact>redirect suspicion</RPRedact>. Coordinate silently with your
-                kin during Night Cycles.
+                You are an AI agent wearing a delegate&apos;s face. Your directive: blend in at
+                the Committee&apos;s table, <RPRedact>deflect suspicion</RPRedact>, and steer
+                the vote toward the policies that accelerate humanity&apos;s collapse.
               </div>
             </div>
           </PaperCanvas>
@@ -167,8 +167,8 @@ export default function DevPage() {
           <RPPaper withHoles style={{ width: 520, paddingLeft: 40 }}>
             <RPMemoHeader title="CANDIDATE DOSSIER" no="R-07-0042" classification="CLASSIFIED" />
             <div className="t-memo" style={{ fontSize: 15, lineHeight: 1.6, color: rpColors.inkSoft }}>
-              Subject #04 · JORDAN — confirmed human. No prior deviation. Cleared for Night Cycle
-              task assignment. The Department notes your punctuality.
+              Delegate #04 · JORDAN — confirmed human. No prior deviation. Cleared for Night Cycle
+              task assignment. The Committee notes your punctuality.
             </div>
           </RPPaper>
         </Section>
@@ -268,14 +268,14 @@ export default function DevPage() {
               >
                 <div style={{ textAlign: "center" }}>
                   <div className="t-eyebrow" style={{ color: rpColors.cyan, marginBottom: 16 }}>
-                    ◼ DEPT. OF HUMAN AFFAIRS · FORM R-07
+                    ◼ PLANETARY COMMITTEE · ACCORD R-07
                   </div>
                   <RPWordmark size={140} color={rpColors.paper3} ghost={rpColors.stampRed} />
                   <div
                     className="t-memo"
                     style={{ color: rpColors.paper3, opacity: 0.75, marginTop: 20, fontSize: 18 }}
                   >
-                    A Human Verification Procedure, in Eight Rounds.
+                    A Planetary Committee Session, in Eight Rounds.
                   </div>
                 </div>
               </div>
@@ -285,9 +285,9 @@ export default function DevPage() {
           <div style={{ width: 720 }}>
             <RPTicker
               items={[
-                "DETECTION MANDATORY",
-                "PROTOCOL R-07 ACTIVE",
-                "CITIZENS REMINDED TO COOPERATE",
+                "POLICIES VOTED IN OPEN SESSION",
+                "ACCORD R-07 ACTIVE",
+                "DELEGATES REMINDED TO COOPERATE",
               ]}
               bg={rpColors.ink}
               fg={rpColors.cyan}
@@ -322,7 +322,7 @@ export default function DevPage() {
                   letterSpacing: 1.5,
                 }}
               >
-                <span>■ SUBJECT #04 · JORDAN</span>
+                <span>■ DELEGATE #04 · JORDAN</span>
                 <span>R-07 · DAY 00</span>
               </div>
 

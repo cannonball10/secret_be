@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // TestSingularity_SeatedWhenEnabled verifies that StartGame deals
@@ -29,22 +29,22 @@ func TestSingularity_SeatedWhenEnabled(t *testing.T) {
 			}
 
 			players, _ := h.loadPlayers(ctx, g.GameID)
-			counts := map[secrethitler.Role]int{}
+			counts := map[replicant.Role]int{}
 			for _, p := range players {
 				counts[p.Role]++
 			}
-			baseLib, baseFas, baseHit, _, _ := secrethitler.RoleDistributionWithSingularity(n)
-			if counts[secrethitler.RoleHuman] != baseLib {
-				t.Errorf("n=%d humans=%d want=%d", n, counts[secrethitler.RoleHuman], baseLib)
+			baseLib, baseFas, baseHit, _, _ := replicant.RoleDistributionWithSingularity(n)
+			if counts[replicant.RoleHuman] != baseLib {
+				t.Errorf("n=%d humans=%d want=%d", n, counts[replicant.RoleHuman], baseLib)
 			}
-			if counts[secrethitler.RoleAI] != baseFas {
-				t.Errorf("n=%d ai=%d want=%d", n, counts[secrethitler.RoleAI], baseFas)
+			if counts[replicant.RoleAI] != baseFas {
+				t.Errorf("n=%d ai=%d want=%d", n, counts[replicant.RoleAI], baseFas)
 			}
-			if counts[secrethitler.RoleRogue] != baseHit {
-				t.Errorf("n=%d rogue=%d want=%d", n, counts[secrethitler.RoleRogue], baseHit)
+			if counts[replicant.RoleRogue] != baseHit {
+				t.Errorf("n=%d rogue=%d want=%d", n, counts[replicant.RoleRogue], baseHit)
 			}
-			if counts[secrethitler.RoleSingularity] != 1 {
-				t.Errorf("n=%d singularity=%d want=1", n, counts[secrethitler.RoleSingularity])
+			if counts[replicant.RoleSingularity] != 1 {
+				t.Errorf("n=%d singularity=%d want=1", n, counts[replicant.RoleSingularity])
 			}
 		})
 	}
@@ -108,9 +108,9 @@ func TestSingularity_KingmakerWin(t *testing.T) {
 			t.Fatalf("warm-up nominate: %v", err)
 		}
 		for _, p := range players {
-			_ = h.CastVote(ctx, g.GameID, p.PlayerID, secrethitler.VoteNein)
+			_ = h.CastVote(ctx, g.GameID, p.PlayerID, replicant.VoteNein)
 			g2, _ := h.loadGame(ctx, g.GameID)
-			if g2.Phase != secrethitler.PhaseElection {
+			if g2.Phase != replicant.PhaseElection {
 				break
 			}
 		}
@@ -129,22 +129,22 @@ func TestSingularity_KingmakerWin(t *testing.T) {
 	// Everyone votes ja so the Singularity gets elected.
 	for _, p := range players {
 		if p.IsAlive {
-			_ = h.CastVote(ctx, g.GameID, p.PlayerID, secrethitler.VoteJa)
+			_ = h.CastVote(ctx, g.GameID, p.PlayerID, replicant.VoteJa)
 			g2, _ := h.loadGame(ctx, g.GameID)
-			if g2.Status == secrethitler.GameStatusCompleted {
+			if g2.Status == replicant.GameStatusCompleted {
 				break
 			}
 		}
 	}
 
 	final, _ := h.loadGame(ctx, g.GameID)
-	if final.Status != secrethitler.GameStatusCompleted {
+	if final.Status != replicant.GameStatusCompleted {
 		t.Fatalf("game did not end: %s", summarize(final))
 	}
-	if final.WinCondition != secrethitler.WinSingularityKingmaker {
-		t.Errorf("WinCondition=%q want=%q", final.WinCondition, secrethitler.WinSingularityKingmaker)
+	if final.WinCondition != replicant.WinSingularityKingmaker {
+		t.Errorf("WinCondition=%q want=%q", final.WinCondition, replicant.WinSingularityKingmaker)
 	}
-	if final.Winner != secrethitler.PartySingularity {
-		t.Errorf("Winner=%q want=%q", final.Winner, secrethitler.PartySingularity)
+	if final.Winner != replicant.PartySingularity {
+		t.Errorf("Winner=%q want=%q", final.Winner, replicant.PartySingularity)
 	}
 }

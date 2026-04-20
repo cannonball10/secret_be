@@ -38,7 +38,7 @@ const interTight = Inter_Tight({
 
 export const metadata: Metadata = {
   title: "REPLICANT · Host",
-  description: "Department of Human Affairs · Form R-07",
+  description: "Planetary Committee · Accord R-07",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

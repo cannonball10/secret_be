@@ -5,19 +5,19 @@ import (
 	"fmt"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // CastVote records a player's ja/nein on the active government. If this
 // was the last outstanding alive player's vote the engine immediately
 // resolves the election (ReasonAllVoted); otherwise we just emit a
 // VoteCast ping and wait for the remaining voters or the timer.
-func (h *GameHandler) CastVote(ctx context.Context, gameID, playerID string, choice secrethitler.VoteChoice) error {
+func (h *GameHandler) CastVote(ctx context.Context, gameID, playerID string, choice replicant.VoteChoice) error {
 	game, err := h.loadGame(ctx, gameID)
 	if err != nil {
 		return err
 	}
-	if err := mustPhase(game, secrethitler.PhaseElection); err != nil {
+	if err := mustPhase(game, replicant.PhaseElection); err != nil {
 		return err
 	}
 
@@ -48,7 +48,7 @@ func (h *GameHandler) CastVote(ctx context.Context, gameID, playerID string, cho
 		return err
 	}
 
-	ev := models.NewGameEvent(gameID, secrethitler.EventVoteCast, playerID)
+	ev := models.NewGameEvent(gameID, replicant.EventVoteCast, playerID)
 	h.broadcast(ctx, ev, VoteCastPayload{
 		GovernmentID: game.CurrentGovernmentID,
 		PlayerID:     playerID,
@@ -89,7 +89,7 @@ func (h *GameHandler) resolveElection(ctx context.Context, game *models.Game, pl
 		return nil, false, err
 	}
 
-	voteMap := make(map[string]secrethitler.VoteChoice, len(votes))
+	voteMap := make(map[string]replicant.VoteChoice, len(votes))
 	ja, nein := 0, 0
 	for _, v := range votes {
 		voteMap[v.PlayerID] = v.Choice
@@ -106,7 +106,7 @@ func (h *GameHandler) resolveElection(ctx context.Context, game *models.Game, pl
 			continue
 		}
 		if _, ok := voteMap[p.PlayerID]; !ok {
-			voteMap[p.PlayerID] = secrethitler.VoteNein
+			voteMap[p.PlayerID] = replicant.VoteNein
 			nein++
 		}
 	}
@@ -116,8 +116,8 @@ func (h *GameHandler) resolveElection(ctx context.Context, game *models.Game, pl
 		return nil, false, err
 	}
 
-	passed := gov.Status == secrethitler.GovernmentStatusPassed
-	resultEvent := models.NewGameEvent(game.GameID, secrethitler.EventElectionResult, "")
+	passed := gov.Status == replicant.GovernmentStatusPassed
+	resultEvent := models.NewGameEvent(game.GameID, replicant.EventElectionResult, "")
 	h.broadcast(ctx, resultEvent, ElectionResultPayload{
 		GovernmentID: gov.GovernmentID,
 		Passed:       passed,
@@ -142,7 +142,7 @@ func (h *GameHandler) resolveElection(ctx context.Context, game *models.Game, pl
 // therefore lives in applyEnactedPolicy.
 func (h *GameHandler) onElectionPassed(ctx context.Context, game *models.Game, gov *models.Government, players []*models.Player) (*models.Government, bool, error) {
 	// Codes-transferred chancellor win conditions. Once the AI cabal
-	// has pushed the Earth Policy Committee past the codes-transfer
+	// has pushed the Planetary Committee past the codes-transfer
 	// threshold, electing a compromised Chancellor hands them the
 	// nuclear codes. Two mutually exclusive winners are possible:
 	//
@@ -153,10 +153,10 @@ func (h *GameHandler) onElectionPassed(ctx context.Context, game *models.Game, g
 	chancellor := findPlayerBySeat(players, *gov.ChancellorSeat)
 	if chancellor != nil && game.RogueZoneActive() {
 		if chancellor.IsRogue() {
-			return gov, true, h.endGame(ctx, game, secrethitler.PartyAI, secrethitler.WinRogueElected)
+			return gov, true, h.endGame(ctx, game, replicant.PartyAI, replicant.WinRogueElected)
 		}
 		if chancellor.IsSingularity() {
-			return gov, true, h.endGame(ctx, game, secrethitler.PartySingularity, secrethitler.WinSingularityKingmaker)
+			return gov, true, h.endGame(ctx, game, replicant.PartySingularity, replicant.WinSingularityKingmaker)
 		}
 	}
 
@@ -170,14 +170,14 @@ func (h *GameHandler) onElectionPassed(ctx context.Context, game *models.Game, g
 	// Whisper policies to the president only.
 	president := findPlayerBySeat(players, gov.PresidentSeat)
 	if president != nil {
-		drawnEvent := models.NewGameEvent(game.GameID, secrethitler.EventPoliciesDrawn, president.PlayerID)
+		drawnEvent := models.NewGameEvent(game.GameID, replicant.EventPoliciesDrawn, president.PlayerID)
 		h.whisper(ctx, drawnEvent, president.PlayerID, PoliciesDrawnPayload{
 			GovernmentID: gov.GovernmentID,
 			Policies:     drawn,
 		})
 	}
 
-	h.setPhase(ctx, game, secrethitler.PhaseLegislativePresident, ReasonAction)
+	h.setPhase(ctx, game, replicant.PhaseLegislativePresident, ReasonAction)
 	if err := h.saveGame(ctx, game); err != nil {
 		return nil, true, err
 	}
@@ -188,7 +188,7 @@ func (h *GameHandler) onElectionPassed(ctx context.Context, game *models.Game, g
 // rotates president, and returns to Nomination.
 func (h *GameHandler) onElectionFailed(ctx context.Context, game *models.Game, players []*models.Player, reason ProgressReason) (*models.Government, bool, error) {
 	game.ElectionTracker++
-	ev := models.NewGameEvent(game.GameID, secrethitler.EventElectionTracker, "")
+	ev := models.NewGameEvent(game.GameID, replicant.EventElectionTracker, "")
 	h.broadcast(ctx, ev, ElectionTrackerPayload{Tracker: game.ElectionTracker})
 
 	if game.ElectionTracker >= game.Rules.ElectionTrackerLimit {
@@ -206,7 +206,7 @@ func (h *GameHandler) onElectionFailed(ctx context.Context, game *models.Game, p
 	}
 
 	h.rotatePresident(game, players)
-	h.setPhase(ctx, game, secrethitler.PhaseNomination, reason)
+	h.setPhase(ctx, game, replicant.PhaseNomination, reason)
 	if err := h.saveGame(ctx, game); err != nil {
 		return nil, false, err
 	}

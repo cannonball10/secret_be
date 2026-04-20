@@ -1,4 +1,4 @@
-// HostNarrator — overlay that plays the Department's voice on the
+// HostNarrator — overlay that plays the Committee's voice on the
 // host TV with an 80-bar waveform driven by real audio amplitude and
 // a typewriter reveal of the script.
 //

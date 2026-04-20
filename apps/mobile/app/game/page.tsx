@@ -372,7 +372,7 @@ export default function MobileGamePage() {
     return (
       <main style={{ padding: 24 }}>
         <div style={{ fontFamily: "var(--font-mono)", color: rpColors.inkFaded }}>
-          Reconnecting to the Department…
+          Reconnecting to the Committee…
         </div>
       </main>
     );
@@ -429,7 +429,7 @@ export default function MobileGamePage() {
         }}
       >
         <span>
-          ■ SUBJECT #{me ? String(me.seat + 1).padStart(2, "0") : "??"} · {me?.displayName ?? "?"}
+          ■ DELEGATE #{me ? String(me.seat + 1).padStart(2, "0") : "??"} · {me?.displayName ?? "?"}
         </span>
         <span>R-07 · {statusLine}</span>
       </div>
@@ -782,7 +782,7 @@ function Body(props: BodyProps) {
       return (
         <WaitFor
           label={"EXECUTIVE\nORDER"}
-          sub={`"${titleCase(presName)} is exercising a Departmental power."`}
+          sub={`"${titleCase(presName)} is exercising an executive power."`}
         />
       );
 
@@ -813,7 +813,7 @@ function Waiting({ seated }: { seated: number }) {
   return (
     <main style={{ padding: "24px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="t-eyebrow" style={{ color: rpColors.inkFaded, fontSize: 10 }}>
-        EARTH POLICY COMMITTEE · PASSPORT
+        PLANETARY COMMITTEE · PASSPORT
       </div>
       <RPWordmark size={40} color={rpColors.ink} ghost={rpColors.stampRed} />
       <div
@@ -834,8 +834,8 @@ function Waiting({ seated }: { seated: number }) {
         className="t-memo"
         style={{ fontSize: 14, color: rpColors.inkSoft, lineHeight: 1.55, maxWidth: 420 }}
       >
-        &quot;Remain still. Do not speak. The Department is processing your assembly. Role
-        allocations will follow shortly.&quot;
+        &quot;Remain seated. The Committee is convening the delegation. Portfolio
+        assignments will follow shortly.&quot;
       </div>
       <div
         style={{
@@ -858,7 +858,7 @@ function Waiting({ seated }: { seated: number }) {
           }}
         >
           {String(seated).padStart(2, "0")}{" "}
-          <span style={{ color: rpColors.inkFaded, fontSize: 16 }}>citizens</span>
+          <span style={{ color: rpColors.inkFaded, fontSize: 16 }}>delegates</span>
         </div>
       </div>
     </main>
@@ -905,7 +905,7 @@ function RoleReveal({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="t-eyebrow" style={{ color: rpColors.inkFaded, fontSize: 10 }}>
-            EARTH POLICY COMMITTEE · PASSPORT
+            PLANETARY COMMITTEE · PASSPORT
             {seat !== null && ` · NO. ${String(seat + 1).padStart(3, "0")}`}
           </div>
           {countryName && (
@@ -1184,7 +1184,7 @@ function HoldToReveal({
           letterSpacing: 1.4,
         }}
       >
-        ACKNOWLEDGED · THE DEPARTMENT APPRECIATES YOUR DISCRETION
+        ACKNOWLEDGED · THE COMMITTEE APPRECIATES YOUR DISCRETION
       </div>
     </>
   );
@@ -1204,7 +1204,7 @@ function NominatePanel({
     <Panel
       eyebrow="OFFICIAL BALLOT · FORM N-01"
       title={"NOMINATE A\nCHANCELLOR"}
-      memo='"Select one eligible citizen to serve alongside you. The assembly will put them to a vote."'
+      memo='"Select one eligible delegate to serve alongside you. The Committee will put them to a vote."'
       action={
         <RPButton
           variant="stamp"
@@ -1398,7 +1398,7 @@ function VetoResolvePanel({
     <Panel
       eyebrow="VETO CONSIDERATION"
       title={"ACCEPT THE\nVETO?"}
-      memo={`"${titleCase(chancellorName)} has proposed that the current agenda be struck without enactment. The Department defers to your judgment."`}
+      memo={`"${titleCase(chancellorName)} has proposed that the current agenda be struck without enactment. The Committee defers to your judgment."`}
       action={
         <JaNein
           yeaLabel="Accept"
@@ -1468,7 +1468,7 @@ function ExecutivePanel({
           </div>
         ) : (
           <div style={{ color: rpColors.inkFaded, fontFamily: "var(--font-mono)", fontSize: 12 }}>
-            Awaiting disclosure from the Department…
+            Awaiting disclosure from the Committee…
           </div>
         )}
       </Panel>
@@ -1552,47 +1552,48 @@ const ROLE_COPY: Record<
     color: rpColors.stampBlue,
     description: (
       <>
-        You are a carbon-based citizen of the Department. Your directive: survive the cycles,
-        observe your peers, and <RPRedact>identify the replicants among you</RPRedact> before the
-        count tips against you.
+        You are a sworn diplomat, seated for your nation at the Planetary Committee. Pass policies
+        that preserve humanity and <RPRedact>identify the AI agents among the delegation</RPRedact>{" "}
+        before the balance tips toward collapse.
       </>
     ),
     objective:
-      "Eliminate all Replicants through Tribunal, or deliver a presidential Execution to the Prime.",
+      "Expel every AI agent through Committee tribunals, or authorise the Prime's termination by executive order.",
   },
   ai: {
     label: "REPLICANT",
     color: rpColors.stampRed,
     description: (
       <>
-        You are a synthetic citizen, indistinguishable from the rest. Your directive: blend in.{" "}
-        <RPRedact>redirect suspicion</RPRedact>. Coordinate silently with your kin during Night
-        Cycles to deactivate humans.
+        You are an AI agent wearing a delegate's face. Your directive: blend in at the table,{" "}
+        <RPRedact>deflect suspicion</RPRedact>, and steer the Committee toward the policies that
+        accelerate humanity's collapse. Coordinate silently with your kin through back-channel cables.
       </>
     ),
     objective:
-      "Outnumber the humans, or escort the Prime to the Chancellery once the board tips.",
+      "Outnumber the human delegates, or escort the Prime to the Chancellery once the Committee is on the brink.",
   },
   rogue: {
     label: "PRIME",
     color: rpColors.amber,
     description: (
       <>
-        You are the Prime Replicant. The kin know you, but you do not know them. If the Department
-        elects you Chancellor after three synthetic policies have passed, the protocol is complete.
+        You are the Prime Replicant — the AI's chosen vector within the Committee. Your kin
+        recognise you; you do not recognise them. If the Committee elects you Chancellor after
+        three collapse policies have passed, the collapse completes.
       </>
     ),
     objective:
-      "Be elected Chancellor when three AI policies are on the board. Otherwise, win with your kin.",
+      "Be elected Chancellor once three AI policies sit on the board. Otherwise, win alongside your kin.",
   },
   singularity: {
     label: "SINGULARITY",
     color: rpColors.amber,
     description: (
       <>
-        You are unaffiliated — a latent artefact neither the Humans nor the Replicants can account
-        for. You know only yourself. Observe both sides. When the codes go live,{" "}
-        <RPRedact>take the Chancellery for yourself</RPRedact>.
+        You are an unaccounted signal at the Committee's table — a presence neither the diplomats
+        nor the Replicants can place. You know only yourself. Observe both sides. When the codes go
+        live, <RPRedact>take the Chancellery for yourself</RPRedact>.
       </>
     ),
     objective:

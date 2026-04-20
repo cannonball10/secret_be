@@ -15,7 +15,7 @@ import (
 	"github.com/cannonball10/foundation/models"
 	audioschema "github.com/cannonball10/foundation/schemas/audio"
 	"github.com/cannonball10/foundation/schemas/database"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // advanceFromCablePhase closes the current Cable Phase, runs the
@@ -32,13 +32,13 @@ import (
 // The phase-transition itself is never blocked by narrator errors —
 // players expect to vote after cable phase regardless.
 func (h *GameHandler) advanceFromCablePhase(ctx context.Context, game *models.Game, reason ProgressReason) error {
-	if game.Phase != secrethitler.PhaseCablePhase {
+	if game.Phase != replicant.PhaseCablePhase {
 		return ErrInvalidTransition
 	}
 
 	leak := h.runCableLeak(ctx, game)
 
-	closedEv := models.NewGameEvent(game.GameID, secrethitler.EventCablePhaseClosed, "")
+	closedEv := models.NewGameEvent(game.GameID, replicant.EventCablePhaseClosed, "")
 	h.broadcast(ctx, closedEv, CablePhaseClosedPayload{
 		GovernmentID:     game.CurrentGovernmentID,
 		Reason:           reason,
@@ -49,15 +49,15 @@ func (h *GameHandler) advanceFromCablePhase(ctx context.Context, game *models.Ga
 	// Fire the leak envelopes after cable_phase_closed so clients
 	// know the phase is over before the narrator starts speaking.
 	if leak.payload != nil {
-		leakEv := models.NewGameEvent(game.GameID, secrethitler.EventCableLeaked, "")
+		leakEv := models.NewGameEvent(game.GameID, replicant.EventCableLeaked, "")
 		h.broadcast(ctx, leakEv, *leak.payload)
 	}
 	if leak.narratorPayload != nil {
-		nEv := models.NewGameEvent(game.GameID, secrethitler.EventNarratorSpeak, "")
+		nEv := models.NewGameEvent(game.GameID, replicant.EventNarratorSpeak, "")
 		h.broadcast(ctx, nEv, *leak.narratorPayload)
 	}
 
-	h.setPhase(ctx, game, secrethitler.PhaseElection, reason)
+	h.setPhase(ctx, game, replicant.PhaseElection, reason)
 	return h.saveGame(ctx, game)
 }
 
@@ -93,7 +93,7 @@ func (h *GameHandler) runCableLeak(ctx context.Context, game *models.Game) cable
 		return result
 	}
 
-	// Silence roll: if the Department decided to go silent, emit a
+	// Silence roll: if the Committee decided to go silent, emit a
 	// silence narrator script but no cable_leaked payload with a
 	// quoted body.
 	silenced := h.rng.Float64() < game.Rules.CableLeakSilenceChance
@@ -132,7 +132,7 @@ func (h *GameHandler) runCableLeak(ctx context.Context, game *models.Game) cable
 	}
 
 	// Persist the Leaked flag + score so the post-game passport can
-	// surface which cables the Department flagged.
+	// surface which cables the Committee flagged.
 	top.Leaked = true
 	top.SubversionScore = topScore
 	if err := h.db.Upsert(ctx, nil, top); err != nil {

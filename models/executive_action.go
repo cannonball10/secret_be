@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 	"github.com/cannonball10/foundation/utils"
 )
 
@@ -20,14 +20,14 @@ type ExecutiveAction struct {
 	ActionID          string                           `json:"actionId"`
 	GameID            string                           `json:"gameId"`
 	Round             int                              `json:"round"`
-	Type              secrethitler.ExecutiveActionType `json:"type"`
+	Type              replicant.ExecutiveActionType `json:"type"`
 	PresidentPlayerID string                           `json:"presidentPlayerId"`
 	TargetPlayerID    string                           `json:"targetPlayerId,omitempty"`
 
 	// RevealedParty holds the party shown by an Investigate Loyalty action.
-	RevealedParty secrethitler.Party `json:"revealedParty,omitempty"`
+	RevealedParty replicant.Party `json:"revealedParty,omitempty"`
 	// PeekedPolicies holds the three policies shown by a Policy Peek.
-	PeekedPolicies []secrethitler.PolicyType `json:"-"`
+	PeekedPolicies []replicant.PolicyType `json:"-"`
 
 	// Completed is true once the president finishes the action (some
 	// actions, like Policy Peek, complete immediately; others wait on
@@ -36,7 +36,7 @@ type ExecutiveAction struct {
 }
 
 // NewExecutiveAction creates an ExecutiveAction in the not-yet-completed state.
-func NewExecutiveAction(id *string, gameID string, round int, t secrethitler.ExecutiveActionType, presidentPlayerID string) *ExecutiveAction {
+func NewExecutiveAction(id *string, gameID string, round int, t replicant.ExecutiveActionType, presidentPlayerID string) *ExecutiveAction {
 	if id == nil || *id == "" {
 		ulid := utils.GenerateULID()
 		id = &ulid

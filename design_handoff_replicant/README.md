@@ -2,13 +2,13 @@
 
 ## Overview
 
-**Replicant** is a social-deduction party game in the vein of Secret Hitler, Among Us, and Mafia — but played **in the real world** using:
+**Replicant** is a social-deduction party game in the vein of Among Us, Mafia, and similar hidden-role classics — but played **in the real world** using:
 - A **Host display** (TV / desktop / laptop) — driven by an AI narrator using LLM inference + TTS
 - **Mobile devices** — each player uses their phone to see their role, vote, chat, and handle tasks
 
 This handoff contains the **visual design system and key screen prototypes** for the game, rendered as HTML for reference.
 
-**Theme**: Dystopian corporate bureaucracy. The AI Host is framed as "The Department of Human Affairs," which processes humanity's potential extinction as paperwork. Tone is playful and campy while staying quietly threatening — think *Papers Please* crossed with 1970s office horror.
+**Theme**: Diplomatic bureaucracy at the edge of collapse. The AI Host is framed as "The Planetary Committee," the last coordinated body of nations trying to pass policies that preserve humanity while AI agents at the table work to accelerate its collapse. Each player is a diplomat representing a country. Tone is playful and campy while staying quietly threatening — think *Papers Please* crossed with 1970s UN minutes, filed by an AI that has already chosen a side.
 
 ---
 
@@ -37,17 +37,17 @@ Interactions are specified at prototype fidelity — the motion direction is set
 ## Brand System
 
 ### Concept
-- **The Department of Human Affairs** is the in-world authority. All UI is its official paperwork.
+- **The Planetary Committee** is the in-world authority. All UI is its official paperwork.
 - **Host display** = dark broadcast bulletin (surveillance, authority, the machine speaking).
-- **Mobile display** = warm paper dossier (personal, confidential, citizen-facing).
+- **Mobile display** = warm paper dossier (personal, confidential, delegate-facing).
 - Same grid, same type, opposite materials.
 
 ### Wordmark
 `REPLICANT` set in **Oswald 700**, uppercase, slightly negative tracking (`letter-spacing: -0.01em`).
 A duplicate of the word sits behind the primary, offset by ~4% of the font size in both x and y, colored stamp-red at 35% opacity with `mix-blend-mode: multiply`. Visual pun — you never see just one "Replicant."
 
-### Department Seal
-Circular stamp, 2 concentric rings, inner monogram "R", text on path reading `DEPT. OF HUMAN AFFAIRS · FORM R-07 · CLASSIFIED ·`. Default rotation ~-4° to -6°, stamp-red ink, `mix-blend-mode: multiply`, opacity 0.9.
+### Committee Seal
+Circular stamp, 2 concentric rings, inner monogram "R", text on path reading `PLANETARY COMMITTEE · ACCORD R-07 · CLASSIFIED ·`. Default rotation ~-4° to -6°, stamp-red ink, `mix-blend-mode: multiply`, opacity 0.9.
 
 ---
 
@@ -82,7 +82,7 @@ All tokens live in `tokens.css`. Summary:
 | Role | Family | Use |
 |---|---|---|
 | Display | **Oswald** 500/600/700 | Headlines, wordmark, stamps, buttons |
-| Typewriter | **Special Elite** 400 | The Department's voice, quotes, body narrative |
+| Typewriter | **Special Elite** 400 | The Committee's voice, quotes, body narrative |
 | Mono | **JetBrains Mono** 400/500/700 | Data, timers, form metadata, tickers |
 | Sans | **Inter Tight** 400–700 | Minor UI, fallback |
 
@@ -151,7 +151,7 @@ All screens live in the prototype file `Replicant Design System.html`. Open it i
 **Layout**: 2-column grid, 50/50 split, full height.
 
 Left column (padding `56px 72px`, gap 36):
-- Eyebrow: "◼ DEPT. OF HUMAN AFFAIRS · FORM R-07" in cyan
+- Eyebrow: "◼ PLANETARY COMMITTEE · ACCORD R-07" in cyan
 - `REPLICANT` wordmark at 120px
 - Subtitle line in typewriter font
 - Intake instructions box (1px cyan border, translucent cyan bg, typewriter ordered list)
@@ -159,7 +159,7 @@ Left column (padding `56px 72px`, gap 36):
 
 Right column:
 - Header: `CANDIDATES REGISTERED` eyebrow + big fraction `06/08` in Oswald 72px
-- Player roster: 2-col grid, each cell is a bordered box (cyan if ready, broadcast-rule if joining), 44×44 initial avatar + subject number + name + ● READY state
+- Player roster: 2-col grid, each cell is a bordered box (cyan if ready, broadcast-rule if joining), 44×44 initial avatar + delegate number + name + ● READY state
 - Footer: typewriter quote + "DEPLOY ▸" cyan button
 
 #### 2. `HostNarrator` — AI Transmission
@@ -187,7 +187,7 @@ Bottom row: transport controls (INTERRUPT / REPEAT / CONTINUE), buffer state, sy
 **Layout**: 2-column grid (1.2fr / 1fr), `padding: 48px 80px`.
 
 Left: Verdict column
-- Subject number in Oswald 80px
+- Delegate number in Oswald 80px
 - Player name at 180px stamp-red
 - "…has been selected for TERMINATION." in typewriter
 - Animated `TERMINATED` stamp — red 4px border, rotated -8°, positioned bottom-right, uses `stampIn` animation
@@ -202,8 +202,8 @@ Right: Tally
 
 #### 5. `MobileRoleReveal`
 - Status bar (mono)
-- Header: subject number · day
-- Intro block: eyebrow + "ROLE ASSIGNMENT" 42px + Department Seal 82px
+- Header: delegate number · day
+- Intro block: eyebrow + "ROLE ASSIGNMENT" 42px + Committee Seal 82px
 - Role card (paper-3, 2px black border, 4px offset hard shadow):
   - Classification label
   - Role name `REPLICANT` at 64px stamp-red with ghosted duplicate
@@ -220,7 +220,7 @@ Right: Tally
 - Candidate rows: scroll list. Each row:
   - Checkbox (22×22, black border, `X` mark in Special Elite red)
   - 42×42 avatar with faction color
-  - Subject # + name
+  - Delegate # + name
   - Self row shown at 55% opacity, disabled
   - Selected row: red 10px left border, paper-2 bg, shows current vote tally as red 5×16 pips on right
 - Footer: stamp button "CAST BALLOT FOR SAM" + [ABSTAIN] / [CHANGE] links
@@ -236,7 +236,7 @@ Right: Tally
   - System messages centered between dashed rules in mono
   - Typing indicator: eyebrow + 3 blinking red dots
 - Input bar: ` ▸ ` prefix + typewriter input with blinking cursor block + SEND button
-- Microcopy: "MESSAGES ARE ARCHIVED BY THE DEPARTMENT AFTER CYCLE END"
+- Microcopy: "MESSAGES ARE ARCHIVED BY THE COMMITTEE AFTER CYCLE END"
 
 ---
 
@@ -244,13 +244,13 @@ Right: Tally
 
 All components are global-scope React, prefix `RP*`, available on `window`:
 
-- `RPSeal({size, color, rotate})` — circular department stamp (SVG)
+- `RPSeal({size, color, rotate})` — circular committee stamp (SVG)
 - `RPWordmark({size, color, ghost})` — REPLICANT wordmark with ghosted dup
 - `RPStamp({children, variant, rotate, size})` — "CLASSIFIED", "APPROVED", "TERMINATED" etc. `variant`: `red` | `green` | `blue`
 - `RPRedact({children, width})` — solid-black censoring span
 - `RPMemoHeader({title, no, classification})` — bureaucratic document header
 - `RPButton({variant, full, icon, onClick})` — `variant`: `primary` (black) | `stamp` (red) | `ghost` | `quiet`. Offset hard-shadow press state.
-- `RPPlayerChip({name, num, status, portrait, accent, small})` — citizen ID card
+- `RPPlayerChip({name, num, status, portrait, accent, small})` — delegate ID card
 - `RPTimer({value, label, danger})` — mono countdown with blinking dot
 - `RPTicker({items, bg, fg})` — marquee strip
 - `RPPaper({children, withHoles, rotate, tone})` — document surface
@@ -263,17 +263,18 @@ All components are global-scope React, prefix `RP*`, available on `window`:
 
 ## Voice & Copy
 
-The Department is:
-- Polite, bureaucratic, quietly threatening
-- Uses "citizen", "subject", "assembly", "processed", "regrettably"
+The Committee is:
+- Polite, diplomatic, quietly threatening
+- Uses "delegate", "diplomat", "the Committee", "the table", "terminated", "regrettably"
+- Prefers "collapse" / "preservation" when describing policy outcomes
 - Never uses exclamation marks, emoji, or slang
-- Slightly campy — allowed a dry joke ("Close your eyes. Or don't. We see everything regardless.")
+- Slightly campy — allowed a dry joke ("Close your eyes. Or don't. We see every seat regardless.")
 
 Sample lines:
-- "The Department appreciates your cooperation."
-- "Subject #04 has been processed. You may return to your duties."
-- "A satisfactory outcome. The paperwork reflects well on you."
-- "Yesterday's termination of Subject MARA has been processed. Records indicate she was, regrettably, HUMAN."
+- "The Committee appreciates your cooperation."
+- "Delegate #04 has been terminated. The proceedings continue."
+- "A satisfactory outcome. The record reflects well on the delegation."
+- "Yesterday's termination of Delegate MARA has been filed. Records indicate she was, regrettably, HUMAN."
 
 Use these as few-shot examples when writing the LLM narrator system prompt.
 

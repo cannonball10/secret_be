@@ -3,12 +3,12 @@ package models
 import (
 	"testing"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 func TestNewEnactedPolicy(t *testing.T) {
-	p := NewEnactedPolicy("G1", 2, secrethitler.PolicyLiberal, "GOV1", false)
-	if p.GameID != "G1" || p.Sequence != 2 || p.Type != secrethitler.PolicyLiberal {
+	p := NewEnactedPolicy("G1", 2, replicant.PolicyHuman, "GOV1", false)
+	if p.GameID != "G1" || p.Sequence != 2 || p.Type != replicant.PolicyHuman {
 		t.Errorf("fields = %+v", p)
 	}
 	if p.GovernmentID != "GOV1" {
@@ -17,7 +17,7 @@ func TestNewEnactedPolicy(t *testing.T) {
 }
 
 func TestEnactedPolicyKeys(t *testing.T) {
-	p := NewEnactedPolicy("G1", 7, secrethitler.PolicyFascist, "", true)
+	p := NewEnactedPolicy("G1", 7, replicant.PolicyAI, "", true)
 	if p.PK() != "GAME#G1" {
 		t.Errorf("PK() = %q", p.PK())
 	}
@@ -28,8 +28,8 @@ func TestEnactedPolicyKeys(t *testing.T) {
 
 func TestPolicyOrdering(t *testing.T) {
 	// Make sure zero-padding yields correct lexicographic order.
-	p1 := NewEnactedPolicy("G1", 2, secrethitler.PolicyLiberal, "", false).SK()
-	p2 := NewEnactedPolicy("G1", 10, secrethitler.PolicyLiberal, "", false).SK()
+	p1 := NewEnactedPolicy("G1", 2, replicant.PolicyHuman, "", false).SK()
+	p2 := NewEnactedPolicy("G1", 10, replicant.PolicyHuman, "", false).SK()
 	if !(p1 < p2) {
 		t.Errorf("expected %q < %q", p1, p2)
 	}

@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 	"github.com/cannonball10/foundation/utils"
 )
 
@@ -20,7 +20,7 @@ var PlayerGSI1Keys = NewKeyBuilder("USER#", "GAME#")
 // Player represents a single user's participation in a single game.
 // The secret Role and Party must never be exposed to other players
 // until the game ends or game-mechanic reveals (investigations,
-// Hitler-chancellor win, etc.) occur.
+// rogue-chancellor win, etc.) occur.
 type Player struct {
 	Timestamps
 
@@ -34,17 +34,17 @@ type Player struct {
 	Seat int `json:"seat"`
 
 	// Role and Party are assigned at game start. Party tracks what other
-	// players would see on an investigation card (Hitler investigates as
-	// a fascist but has his own role).
-	Role  secrethitler.Role  `json:"role,omitempty"`
-	Party secrethitler.Party `json:"party,omitempty"`
+	// players would see on an investigation card (the rogue/Prime
+	// investigates as AI but has its own role).
+	Role  replicant.Role  `json:"role,omitempty"`
+	Party replicant.Party `json:"party,omitempty"`
 
 	IsHost      bool `json:"isHost"`
 	IsAlive     bool `json:"isAlive"`
 	IsConnected bool `json:"isConnected"`
 
 	// Country is the world-power delegation this player represents on
-	// the Earth Policy Committee. Assigned at StartGame from a rotating
+	// the Planetary Committee. Assigned at StartGame from a rotating
 	// pool keyed on seat so every table has a distinct set. CountryCode
 	// is the ISO-3166-1 alpha-2 code used for the passport stamp UI;
 	// CountryName is the full display string. Both are empty while the
@@ -86,9 +86,9 @@ func (p *Player) GSIs() map[int]GSIKeyPair {
 }
 
 // AssignRole sets a player's secret role and derives the party.
-func (p *Player) AssignRole(role secrethitler.Role) {
+func (p *Player) AssignRole(role replicant.Role) {
 	p.Role = role
-	p.Party = secrethitler.PartyFor(role)
+	p.Party = replicant.PartyFor(role)
 	p.Touch()
 }
 
@@ -99,15 +99,15 @@ func (p *Player) Kill() {
 	p.Touch()
 }
 
-// IsRogue returns true if this player was assigned the Hitler role.
+// IsRogue returns true if this player was assigned the rogue (Prime) role.
 func (p *Player) IsRogue() bool {
-	return p.Role == secrethitler.RoleRogue
+	return p.Role == replicant.RoleRogue
 }
 
 // IsSingularity returns true if this player was assigned the
 // Singularity role (only dealt when Rules.EnableSingularity is on).
 func (p *Player) IsSingularity() bool {
-	return p.Role == secrethitler.RoleSingularity
+	return p.Role == replicant.RoleSingularity
 }
 
 // MarkInvestigatedBy records that the given investigator seat has now

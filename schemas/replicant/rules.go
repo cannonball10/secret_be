@@ -1,4 +1,4 @@
-package secrethitler
+package replicant
 
 import "fmt"
 
@@ -30,7 +30,7 @@ type RulesConfig struct {
 
 	// CodesTransferAt is the count of enacted AI policies after which
 	// electing the Prime (rogue) as Chancellor triggers an instant
-	// AI-faction win. In vanilla Secret Hitler this is 3.
+	// AI-faction win. In the standard ruleset this is 3.
 	CodesTransferAt int `json:"codesTransferAt"`
 
 	// ElectionTrackerLimit is the number of consecutive failed
@@ -66,7 +66,7 @@ type RulesConfig struct {
 	CablePhaseDurationSec int `json:"cablePhaseDurationSec"`
 
 	// CableLeakSilenceChance is the probability [0, 1] that the
-	// Department will go silent at phase-end — i.e. broadcast "no
+	// Committee will go silent at phase-end — i.e. broadcast "no
 	// traffic worth flagging" instead of leaking the top-scored
 	// cable. Small non-zero values (~0.1-0.2) are the sweet spot:
 	// enough uncertainty to keep players guessing whether their
@@ -84,7 +84,7 @@ const (
 	PackageMaxPlayers = 10
 )
 
-// DefaultRules returns the vanilla Secret Hitler ruleset. This is what
+// DefaultRules returns the vanilla Replicant ruleset. This is what
 // NewGame stamps when no overrides are supplied, and what loadGame
 // substitutes into records that predate the Rules field.
 func DefaultRules() RulesConfig {

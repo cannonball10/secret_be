@@ -439,7 +439,7 @@ function handlePresidentDiscarded(
   return next;
 }
 
-// VETO_UNLOCK_THRESHOLD mirrors schemas/secrethitler.VetoUnlockThreshold.
+// VETO_UNLOCK_THRESHOLD mirrors schemas/replicant.VetoUnlockThreshold.
 // Kept here so the reducer can derive game.vetoUnlocked without waiting
 // on a dedicated event (the current backend doesn't broadcast it).
 const VETO_UNLOCK_THRESHOLD = 5;

@@ -3,15 +3,15 @@ package models
 import (
 	"testing"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 func TestNewExecutiveAction(t *testing.T) {
-	a := NewExecutiveAction(nil, "G1", 5, secrethitler.ActionExecution, "pres")
+	a := NewExecutiveAction(nil, "G1", 5, replicant.ActionExecution, "pres")
 	if a.ActionID == "" {
 		t.Fatal("expected ActionID to be generated")
 	}
-	if a.Type != secrethitler.ActionExecution {
+	if a.Type != replicant.ActionExecution {
 		t.Errorf("Type = %q", a.Type)
 	}
 	if a.Completed {
@@ -21,7 +21,7 @@ func TestNewExecutiveAction(t *testing.T) {
 
 func TestExecutiveActionKeys(t *testing.T) {
 	id := "A1"
-	a := NewExecutiveAction(&id, "G1", 1, secrethitler.ActionPolicyPeek, "p")
+	a := NewExecutiveAction(&id, "G1", 1, replicant.ActionPolicyPeek, "p")
 	if a.PK() != "GAME#G1" {
 		t.Errorf("PK() = %q", a.PK())
 	}
@@ -31,7 +31,7 @@ func TestExecutiveActionKeys(t *testing.T) {
 }
 
 func TestExecutiveAction_Complete(t *testing.T) {
-	a := NewExecutiveAction(nil, "G1", 1, secrethitler.ActionPolicyPeek, "p")
+	a := NewExecutiveAction(nil, "G1", 1, replicant.ActionPolicyPeek, "p")
 	a.Complete()
 	if !a.Completed {
 		t.Error("expected Completed=true")

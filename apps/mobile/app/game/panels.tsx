@@ -113,7 +113,7 @@ export function WaitFor({ label, sub }: { label: string; sub?: string }) {
       eyebrow="STANDBY"
       eyebrowColor={rpColors.inkFaded}
       title={label}
-      memo={sub ?? '"The Department will notify you when your turn arrives."'}
+      memo={sub ?? '"The Committee will notify you when your turn arrives."'}
     />
   );
 }
@@ -208,7 +208,7 @@ export function CablePanel({
         className="t-memo"
         style={{ fontSize: 13, color: rpColors.inkSoft, lineHeight: 1.45, maxWidth: 360 }}
       >
-        &quot;Compose any cable you wish the Department to review. One may be
+        &quot;Compose any cable you wish the Committee to review. One may be
         broadcast. You may submit more than once.&quot;
       </div>
 
@@ -291,7 +291,7 @@ export function CablePanel({
 // ─── nominate + executive target + vote-for-player pickers ────────
 
 /**
- * A candidate row with an RPCheckbox, portrait, subject number, and
+ * A candidate row with an RPCheckbox, portrait, delegate number, and
  * display name. Used by Nominate + Executive-target pickers.
  */
 export function CandidateRow({
@@ -355,7 +355,7 @@ export function CandidateRow({
             letterSpacing: 1.2,
           }}
         >
-          SUBJECT #{String(p.seat + 1).padStart(2, "0")}
+          DELEGATE #{String(p.seat + 1).padStart(2, "0")}
         </div>
         <div
           style={{
@@ -457,7 +457,7 @@ export function PolicyButton({
 // The component's `onYea`/`onNay` callbacks still map to the engine's
 // "ja" / "nein" VoteChoice wire values — we kept the backend enum
 // intact to avoid data migration. Only the displayed labels reflect
-// the Earth Policy Committee theme.
+// the Planetary Committee theme.
 
 export function JaNein({
   onYea,
@@ -557,8 +557,8 @@ export function Terminated({
           maxWidth: 320,
         }}
       >
-        &quot;Your ballot is void. You may observe the remainder of the
-        assembly&apos;s deliberations; you may not speak of them afterward.&quot;
+        &quot;Your credentials are revoked. You may observe the remainder of the
+        Committee&apos;s deliberations; you may not speak of them afterward.&quot;
       </div>
 
       {/* Live broadcast slab — mimics the manila debrief form. */}
@@ -734,7 +734,7 @@ export function GameOverPanel({
         className="t-memo"
         style={{ fontSize: 14, color: rpColors.inkSoft, lineHeight: 1.5, textAlign: "center", maxWidth: 320 }}
       >
-        {condition ? winMemo(condition) : "The Department has filed its findings."}
+        {condition ? winMemo(condition) : "The Committee has filed its findings."}
       </div>
       <div
         style={{
@@ -758,13 +758,13 @@ export function GameOverPanel({
 function winMemo(c: WinCondition): string {
   switch (c) {
     case "human_policies":
-      return '"Five Human protocols ratified. The synthetic threat has been contained."';
+      return '"Five human policies ratified. The collapse has been held back; humanity endures."';
     case "ai_policies":
-      return '"Six AI protocols passed. The transition has been completed in good order."';
+      return '"Six AI policies passed. The collapse unfolds in good order."';
     case "rogue_elected_chancellor":
-      return '"The Prime has been elected to the Chancellery. The Department yields its keys."';
+      return '"The Prime has been elected to the Chancellery. The Committee yields its keys."';
     case "rogue_executed":
-      return '"The Prime has been processed. The population is returned to its former allocation."';
+      return '"The Prime has been terminated. The Committee resumes normal proceedings."';
     case "singularity_kingmaker":
       return '"The Singularity has taken the Chancellery. Neither faction prevails — a solitary victor claims the codes."';
   }
@@ -872,23 +872,23 @@ function accentFor(r: Role): string {
 export const EXEC_COPY: Record<ExecutiveActionType, { title: string; memo: string }> = {
   investigate_loyalty: {
     title: "INVESTIGATE\nLOYALTY",
-    memo: '"Select one citizen for file inspection. Their party affiliation will be disclosed to you alone."',
+    memo: '"Select one delegate for file inspection. Their party affiliation will be disclosed to you alone."',
   },
   special_election: {
     title: "SPECIAL\nELECTION",
-    memo: '"Appoint the next Presidential candidate. The Department will restore normal rotation afterward."',
+    memo: '"Appoint the next Presidential candidate. The Committee will restore normal rotation afterward."',
   },
   policy_peek: {
     title: "POLICY\nPEEK",
-    memo: '"You may review the next three policies to be drawn. Disclosure to fellow citizens is inadvisable."',
+    memo: '"You may review the next three policies to be drawn. Disclosure to fellow delegates is inadvisable."',
   },
   execution: {
     title: "EXECUTION",
-    memo: '"Nominate one citizen for immediate processing. The Department will action this without further review."',
+    memo: '"Nominate one delegate for immediate termination. The Committee will action this without further review."',
   },
   top_deck: {
     title: "TOP DECK",
-    memo: '"The Department will action the next policy automatically."',
+    memo: '"The Committee will action the next policy automatically."',
   },
 };
 

@@ -1,5 +1,5 @@
 // RPMemoHeader — a bureaucratic document header strip. Two-line
-// masthead (department + title) on the left, form metadata
+// masthead (committee + title) on the left, form metadata
 // (form number + classification) on the right, separated by a 2px
 // ink rule. Sits at the top of any RPPaper used as a formal memo.
 
@@ -31,7 +31,7 @@ export function RPMemoHeader({
     >
       <div>
         <div className="t-eyebrow" style={{ color: rpColors.inkFaded, marginBottom: 2 }}>
-          DEPT. OF HUMAN AFFAIRS
+          PLANETARY COMMITTEE
         </div>
         <div className="t-display" style={{ fontSize: 22, color: rpColors.ink }}>
           {title}

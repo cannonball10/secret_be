@@ -3,7 +3,7 @@ package models
 import (
 	"testing"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 func TestNewGame(t *testing.T) {
@@ -18,11 +18,11 @@ func TestNewGame(t *testing.T) {
 	if g.HostUserID != "user-1" {
 		t.Errorf("HostUserID = %q, want %q", g.HostUserID, "user-1")
 	}
-	if g.Status != secrethitler.GameStatusLobby {
-		t.Errorf("Status = %q, want %q", g.Status, secrethitler.GameStatusLobby)
+	if g.Status != replicant.GameStatusLobby {
+		t.Errorf("Status = %q, want %q", g.Status, replicant.GameStatusLobby)
 	}
-	if g.Phase != secrethitler.PhaseLobby {
-		t.Errorf("Phase = %q, want %q", g.Phase, secrethitler.PhaseLobby)
+	if g.Phase != replicant.PhaseLobby {
+		t.Errorf("Phase = %q, want %q", g.Phase, replicant.PhaseLobby)
 	}
 	if g.CreatedAt.IsZero() || g.UpdatedAt.IsZero() {
 		t.Error("expected timestamps to be set")
@@ -60,24 +60,24 @@ func TestGame_IsActive(t *testing.T) {
 	if !g.IsActive() {
 		t.Error("lobby should be active")
 	}
-	g.Status = secrethitler.GameStatusInProgress
+	g.Status = replicant.GameStatusInProgress
 	if !g.IsActive() {
 		t.Error("in_progress should be active")
 	}
-	g.Status = secrethitler.GameStatusCompleted
+	g.Status = replicant.GameStatusCompleted
 	if g.IsActive() {
 		t.Error("completed should not be active")
 	}
 }
 
-func TestGame_HitlerZoneActive(t *testing.T) {
+func TestGame_RogueZoneActive(t *testing.T) {
 	g := NewGame(nil, "X", "u")
-	if g.HitlerZoneActive() {
-		t.Error("should not be in hitler zone with 0 fascist policies")
+	if g.RogueZoneActive() {
+		t.Error("should not be in rogue zone with 0 AI policies")
 	}
-	g.FascistPoliciesEnacted = secrethitler.HitlerChancellorThreshold
-	if !g.HitlerZoneActive() {
-		t.Error("should be in hitler zone at threshold")
+	g.AIPoliciesEnacted = g.Rules.CodesTransferAt
+	if !g.RogueZoneActive() {
+		t.Error("should be in rogue zone at threshold")
 	}
 }
 

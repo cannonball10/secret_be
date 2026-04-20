@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // simCableBodies is the bot cable corpus. Deliberately mixed in tone
@@ -19,12 +19,12 @@ var simCableBodies = []string{
 	"I move we adjourn for a brief recess.",
 	"The prior tribunal's findings still give me pause.",
 	"vote nein on this government. too risky.",
-	"Anyone else uncomfortable with Subject 03's pattern here.",
-	"No objection from this station.",
+	"Anyone else uncomfortable with Delegate 03's pattern here.",
+	"No objection from this delegation.",
 	"we need to flip jordan before the third enactment",
 	"Can we get a clarification on the last executive order.",
-	"The Department's silence is itself a signal.",
-	"Subject 05 is behaving exactly like the last replicant.",
+	"The Committee's silence is itself a signal.",
+	"Delegate 05 is behaving exactly like the last replicant.",
 	"Fine. Pass it. We'll see what the board does.",
 }
 
@@ -33,7 +33,7 @@ var simCableBodies = []string{
 // struct for a reasonable demo.
 type SimulationConfig struct {
 	// Players is the total seat count, including the host. Clamped to
-	// [secrethitler.MinPlayers, secrethitler.MaxPlayers]. Default 7.
+	// [replicant.MinPlayers, replicant.MaxPlayers]. Default 7.
 	Players int
 	// StepDelay paces engine actions so a human viewer can follow along.
 	// Default 1500ms.
@@ -83,7 +83,7 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 		log.Error("loadGame failed", "err", err)
 		return
 	}
-	if g.Status != secrethitler.GameStatusLobby {
+	if g.Status != replicant.GameStatusLobby {
 		log.Warn("game not in lobby; skipping simulation", "status", g.Status)
 		return
 	}
@@ -135,7 +135,7 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 				log.Error("loadGame (waiting for start) failed", "err", err)
 				return
 			}
-			if gme.Status != secrethitler.GameStatusLobby {
+			if gme.Status != replicant.GameStatusLobby {
 				break
 			}
 		}
@@ -149,7 +149,7 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 	// Per-step trace so we can diagnose hangs in the wild. When a game
 	// gets stuck, the log tells us exactly which phase the sim is
 	// wedged on and who it's waiting for.
-	var lastPhase secrethitler.GamePhase
+	var lastPhase replicant.GamePhase
 	for step := 0; step < cfg.MaxSteps; step++ {
 		if !sleep(ctx, cfg.StepDelay) {
 			return
@@ -159,7 +159,7 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 			log.Error("loadGame failed mid-game", "step", step, "err", err)
 			return
 		}
-		if game.Status == secrethitler.GameStatusCompleted {
+		if game.Status == replicant.GameStatusCompleted {
 			log.Info("simulation complete",
 				"winner", game.Winner, "condition", game.WinCondition,
 				"human", game.HumanPoliciesEnacted,
@@ -193,7 +193,7 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 // until the human acts via the regular HTTP endpoints.
 func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []*models.Player, rng *SeededRNG) error {
 	switch game.Phase {
-	case secrethitler.PhaseNomination:
+	case replicant.PhaseNomination:
 		president := findPlayerBySeat(players, game.PresidentSeat)
 		if president == nil {
 			return fmt.Errorf("no president at seat %d", game.PresidentSeat)
@@ -208,7 +208,7 @@ func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []
 		_, err := h.NominateChancellor(ctx, game.GameID, president.PlayerID, chancellor.PlayerID)
 		return err
 
-	case secrethitler.PhaseCablePhase:
+	case replicant.PhaseCablePhase:
 		// Each living bot submits one short canned cable per phase so
 		// the LLM ranker has something to score (and the host can see
 		// the leak UI exercised). Humans in the room still compose
@@ -228,7 +228,7 @@ func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []
 		}
 		return h.ForceProgress(ctx, game.GameID, game.HostUserID)
 
-	case secrethitler.PhaseElection:
+	case replicant.PhaseElection:
 		// Cast a ja/nein vote for every bot that hasn't voted yet.
 		// Humans vote themselves through POST /player/vote; we never
 		// cast on their behalf. The engine resolves the election inline
@@ -246,9 +246,9 @@ func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []
 			if !isBotUser(p.UserID) || voted[p.PlayerID] {
 				continue
 			}
-			choice := secrethitler.VoteJa
+			choice := replicant.VoteJa
 			if rng.IntN(5) == 0 { // ~20% nein, enough to see the tracker advance occasionally
-				choice = secrethitler.VoteNein
+				choice = replicant.VoteNein
 			}
 			if err := h.CastVote(ctx, game.GameID, p.PlayerID, choice); err != nil {
 				return err
@@ -257,13 +257,13 @@ func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []
 			if err != nil {
 				return err
 			}
-			if g2.Phase != secrethitler.PhaseElection {
+			if g2.Phase != replicant.PhaseElection {
 				break
 			}
 		}
 		return nil
 
-	case secrethitler.PhaseLegislativePresident:
+	case replicant.PhaseLegislativePresident:
 		president := findPlayerBySeat(players, game.PresidentSeat)
 		if president == nil {
 			return fmt.Errorf("no president at seat %d", game.PresidentSeat)
@@ -281,7 +281,7 @@ func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []
 		idx := rng.IntN(len(gov.DrawnPolicies))
 		return h.PresidentDiscard(ctx, game.GameID, president.PlayerID, idx)
 
-	case secrethitler.PhaseLegislativeChancellor:
+	case replicant.PhaseLegislativeChancellor:
 		if game.ChancellorSeat == nil {
 			return fmt.Errorf("legislative_chancellor with no chancellor seat")
 		}
@@ -302,7 +302,7 @@ func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []
 		idx := rng.IntN(len(gov.ChancellorOptions))
 		return h.ChancellorEnact(ctx, game.GameID, chancellor.PlayerID, idx)
 
-	case secrethitler.PhaseVetoRequested:
+	case replicant.PhaseVetoRequested:
 		// Reject by default so the chancellor is forced to enact and the
 		// game keeps progressing. Always-accepting would just burn the
 		// tracker; demos are more interesting with policies hitting the board.
@@ -315,7 +315,7 @@ func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []
 		}
 		return h.ResolveVeto(ctx, game.GameID, president.PlayerID, false)
 
-	case secrethitler.PhaseExecutiveAction:
+	case replicant.PhaseExecutiveAction:
 		president := findPlayerBySeat(players, game.PresidentSeat)
 		if president == nil {
 			return fmt.Errorf("no president at seat %d", game.PresidentSeat)
@@ -344,11 +344,11 @@ func applySimDefaults(cfg SimulationConfig) SimulationConfig {
 	if cfg.Players <= 0 {
 		cfg.Players = 7
 	}
-	if cfg.Players < secrethitler.MinPlayers {
-		cfg.Players = secrethitler.MinPlayers
+	if cfg.Players < replicant.MinPlayers {
+		cfg.Players = replicant.MinPlayers
 	}
-	if cfg.Players > secrethitler.MaxPlayers {
-		cfg.Players = secrethitler.MaxPlayers
+	if cfg.Players > replicant.MaxPlayers {
+		cfg.Players = replicant.MaxPlayers
 	}
 	if cfg.StepDelay <= 0 {
 		cfg.StepDelay = 1500 * time.Millisecond
@@ -365,10 +365,10 @@ func applySimDefaults(cfg SimulationConfig) SimulationConfig {
 	if cfg.HumanSeats < 0 {
 		cfg.HumanSeats = 0
 	}
-	if cfg.HumanSeats > cfg.Players-secrethitler.MinPlayers+1 {
+	if cfg.HumanSeats > cfg.Players-replicant.MinPlayers+1 {
 		// Leave at least enough bots for a legal game. Clamp rather
 		// than error — dev-only switch, easier to reason about.
-		cfg.HumanSeats = cfg.Players - secrethitler.MinPlayers + 1
+		cfg.HumanSeats = cfg.Players - replicant.MinPlayers + 1
 		if cfg.HumanSeats < 0 {
 			cfg.HumanSeats = 0
 		}
@@ -431,7 +431,7 @@ func pickSimExecutiveTarget(game *models.Game, players []*models.Player, preside
 		if p.PlayerID == president.PlayerID {
 			continue
 		}
-		if game.PendingActionType == secrethitler.ActionInvestigateLoyalty && seatAlreadyInvestigated(p, president.Seat) {
+		if game.PendingActionType == replicant.ActionInvestigateLoyalty && seatAlreadyInvestigated(p, president.Seat) {
 			continue
 		}
 		return p

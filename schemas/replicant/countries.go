@@ -1,6 +1,6 @@
-package secrethitler
+package replicant
 
-// Country is one delegation on the Earth Policy Committee. Each seat
+// Country is one delegation on the Planetary Committee. Each seat
 // at the table is assigned a distinct country at StartGame so every
 // table plays as a plausible UN-style security-policy council.
 type Country struct {

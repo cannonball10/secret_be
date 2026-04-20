@@ -2,7 +2,7 @@
 
 A real-world social-deduction party game (Humans vs. AI) with a TV host display + mobile phones.
 
-This repo is mid-pivot from an earlier Secret Hitler prototype. The Go engine at the repo root (`cmd/api/`, `handlers/game/`, `models/`, `schemas/secrethitler/`) is intact and will be wired up as the realtime backend in Phase 2 — semantics already renamed to human / ai / rogue. The new monorepo (`apps/`, `packages/`) lives alongside it.
+This repo is mid-pivot from an earlier Replicant prototype. The Go engine at the repo root (`cmd/api/`, `handlers/game/`, `models/`, `schemas/replicant/`) is intact and will be wired up as the realtime backend in Phase 2 — semantics already renamed to human / ai / rogue. The new monorepo (`apps/`, `packages/`) lives alongside it.
 
 ## Status
 
@@ -26,7 +26,7 @@ replicant/
 ├─ cmd/api/               Go server entrypoint (will become apps/server in Phase 2)
 ├─ handlers/game/         Game engine (phase machine, rules, powers)
 ├─ models/                DynamoDB-backed entities
-├─ schemas/secrethitler/  Canonical enums (now human/ai/rogue)
+├─ schemas/replicant/  Canonical enums (now human/ai/rogue)
 └─ api/                   HTTP + SSE transport
 ```
 
@@ -163,7 +163,7 @@ Phase-dispatched action panels render based on `game.phase` + role + whisper sta
 - **ExecutivePanel** — adapts to power: Investigate / Special Election / Execution show the target picker (with inline investigation-result tags); Policy Peek shows the three upcoming policies.
 - **Terminated** — full-screen "PROCESSING COMPLETE" with animated stamp if the player has been executed mid-game.
 - **GameOverPanel** — winner announcement + per-condition memo + personal-file-reflection stamp.
-- **WaitFor** — used for every "someone else is acting" state, with a memo quoting the Department.
+- **WaitFor** — used for every "someone else is acting" state, with a memo quoting the Committee.
 - **RoleReminder** — sticky bottom bar with a hold-to-reveal trigger, always available once the dossier is acknowledged.
 - **ChatDrawer** — AI-faction private room (70vh bottom sheet). Typewriter bubbles, self-alignment, archive-on-close micro-copy. Floating red **◼ KIN CHANNEL** FAB toggles it; unread count badge shows on the FAB.
 
@@ -171,7 +171,7 @@ Mobile API surface extended: `nominateChancellor`, `castVote`, `presidentDiscard
 
 ### `apps/host` — phase-aware TV broadcast
 Replaces the Phase-2 placeholder. Layout is two columns inside `RPTVChrome`:
-- **Left stage**: phase-specific `BigLabel` — NOMINATION / TRIBUNAL · VOTE / SORTING ROOM / DRAFTING FLOOR / VETO CONSIDERATION / EXECUTIVE ORDER — with ghost-dup title treatment, Department-voice memo, and a live `VoteMeter` bar during election phase showing ballots cast vs alive count.
+- **Left stage**: phase-specific `BigLabel` — NOMINATION / TRIBUNAL · VOTE / SORTING ROOM / DRAFTING FLOOR / VETO CONSIDERATION / EXECUTIVE ORDER — with ghost-dup title treatment, Committee-voice memo, and a live `VoteMeter` bar during election phase showing ballots cast vs alive count.
 - **Last-election banner**: persists after every real election result — "LAST TRIBUNAL · NAME + NAME · JA X NEIN Y · PASSED/REJECTED" in mono with an accent color.
 - **Right column**:
   - **PolicyTrack** — HUMAN 5-slot / AI 6-slot bars filling with each enactment, plus a 3-pip election-tracker strip and VETO LOCKED/UNLOCKED indicator.
@@ -225,7 +225,7 @@ Every AI/rogue phone shows the KIN CHANNEL FAB during play. Tapping opens the dr
 2. Restart `pnpm dev:server`. Logs should print `narrator ready model=claude-sonnet-4-6 voice=...`.
 3. Spin up host + mobile, run a quick lobby + start.
 4. On the host TV, click **▸ SPEAK** in the bottom-right corner.
-5. ~1-3s later the overlay slides in: 80-bar waveform pumping in cyan against the audio, typewriter script reveals as the Department speaks, last-word reveal underlined in stamp-red.
+5. ~1-3s later the overlay slides in: 80-bar waveform pumping in cyan against the audio, typewriter script reveals as the Committee speaks, last-word reveal underlined in stamp-red.
 6. ⏭ CONTINUE dismisses early; otherwise the overlay self-clears when audio ends.
 
 If the narrator route returns 503, the server is missing one of the two creds — check `pnpm dev:server` startup logs for the disabled reason.

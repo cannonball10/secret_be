@@ -1,6 +1,6 @@
-# secret-hitler-web
+# replicant-web
 
-Dead-simple React + TypeScript client for the Secret Hitler backend.
+Dead-simple React + TypeScript client for the Replicant backend.
 
 ## Layout
 

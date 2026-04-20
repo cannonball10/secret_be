@@ -34,7 +34,7 @@ const interTight = Inter_Tight({
 
 export const metadata: Metadata = {
   title: "REPLICANT · Passport",
-  description: "Earth Policy Committee · Delegate Terminal",
+  description: "Planetary Committee · Delegate Terminal",
 };
 
 export const viewport: Viewport = {
