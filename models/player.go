@@ -20,7 +20,7 @@ var PlayerGSI1Keys = NewKeyBuilder("USER#", "GAME#")
 // Player represents a single user's participation in a single game.
 // The secret Role and Party must never be exposed to other players
 // until the game ends or game-mechanic reveals (investigations,
-// Hitler-chancellor win, etc.) occur.
+// rogue-chancellor win, etc.) occur.
 type Player struct {
 	Timestamps
 
@@ -34,8 +34,8 @@ type Player struct {
 	Seat int `json:"seat"`
 
 	// Role and Party are assigned at game start. Party tracks what other
-	// players would see on an investigation card (Hitler investigates as
-	// a fascist but has his own role).
+	// players would see on an investigation card (the rogue/Prime
+	// investigates as AI but has its own role).
 	Role  replicant.Role  `json:"role,omitempty"`
 	Party replicant.Party `json:"party,omitempty"`
 
@@ -99,7 +99,7 @@ func (p *Player) Kill() {
 	p.Touch()
 }
 
-// IsRogue returns true if this player was assigned the Hitler role.
+// IsRogue returns true if this player was assigned the rogue (Prime) role.
 func (p *Player) IsRogue() bool {
 	return p.Role == replicant.RoleRogue
 }

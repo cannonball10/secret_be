@@ -66,9 +66,9 @@ func TestGovernment_RecordElection(t *testing.T) {
 
 func TestGovernment_RecordEnactment(t *testing.T) {
 	g := NewGovernment(nil, "G1", 1, "pres", 0)
-	g.RecordEnactment(replicant.PolicyFascist)
+	g.RecordEnactment(replicant.PolicyAI)
 
-	if g.EnactedPolicy == nil || *g.EnactedPolicy != replicant.PolicyFascist {
+	if g.EnactedPolicy == nil || *g.EnactedPolicy != replicant.PolicyAI {
 		t.Errorf("EnactedPolicy = %v", g.EnactedPolicy)
 	}
 	if g.Status != replicant.GovernmentStatusEnacted {

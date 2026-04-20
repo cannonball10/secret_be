@@ -45,21 +45,21 @@ func TestPlayerKeys(t *testing.T) {
 
 func TestPlayer_AssignRole(t *testing.T) {
 	p := NewPlayer(nil, "g", "u", "a", false)
-	p.AssignRole(replicant.RoleHitler)
+	p.AssignRole(replicant.RoleRogue)
 
-	if p.Role != replicant.RoleHitler {
+	if p.Role != replicant.RoleRogue {
 		t.Errorf("Role = %q", p.Role)
 	}
-	if p.Party != replicant.PartyFascist {
-		t.Errorf("Hitler should be in fascist party, got %q", p.Party)
+	if p.Party != replicant.PartyAI {
+		t.Errorf("Rogue should be in AI party, got %q", p.Party)
 	}
-	if !p.IsHitler() {
-		t.Error("IsHitler() should be true")
+	if !p.IsRogue() {
+		t.Error("IsRogue() should be true")
 	}
 
-	p.AssignRole(replicant.RoleLiberal)
-	if p.Party != replicant.PartyLiberal {
-		t.Errorf("Liberal party expected, got %q", p.Party)
+	p.AssignRole(replicant.RoleHuman)
+	if p.Party != replicant.PartyHuman {
+		t.Errorf("Human party expected, got %q", p.Party)
 	}
 }
 

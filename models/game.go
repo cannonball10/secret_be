@@ -133,10 +133,10 @@ func (g *Game) IsActive() bool {
 		g.Status == replicant.GameStatusInProgress
 }
 
-// RogueZoneActive indicates fascist policies have reached the threshold
-// where electing Hitler as Chancellor wins the game for the fascists.
-// Reads from game.Rules — use ensureRules() before calling on a record
-// loaded from storage.
+// RogueZoneActive indicates AI policies have reached the threshold
+// where electing the Prime (rogue) as Chancellor wins the game for
+// the AI cabal. Reads from game.Rules — use ensureRules() before
+// calling on a record loaded from storage.
 func (g *Game) RogueZoneActive() bool {
 	return g.AIPoliciesEnacted >= g.Rules.CodesTransferAt
 }

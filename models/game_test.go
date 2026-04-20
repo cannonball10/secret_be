@@ -70,14 +70,14 @@ func TestGame_IsActive(t *testing.T) {
 	}
 }
 
-func TestGame_HitlerZoneActive(t *testing.T) {
+func TestGame_RogueZoneActive(t *testing.T) {
 	g := NewGame(nil, "X", "u")
-	if g.HitlerZoneActive() {
-		t.Error("should not be in hitler zone with 0 fascist policies")
+	if g.RogueZoneActive() {
+		t.Error("should not be in rogue zone with 0 AI policies")
 	}
-	g.FascistPoliciesEnacted = replicant.HitlerChancellorThreshold
-	if !g.HitlerZoneActive() {
-		t.Error("should be in hitler zone at threshold")
+	g.AIPoliciesEnacted = g.Rules.CodesTransferAt
+	if !g.RogueZoneActive() {
+		t.Error("should be in rogue zone at threshold")
 	}
 }
 

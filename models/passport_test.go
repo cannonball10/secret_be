@@ -31,23 +31,24 @@ func TestPassport_RecordGame(t *testing.T) {
 	p := NewPassport("u")
 	ended := time.Now().UTC()
 
-	p.RecordGame(replicant.RoleLiberal, true, ended)
-	p.RecordGame(replicant.RoleFascist, false, ended)
-	p.RecordGame(replicant.RoleHitler, true, ended)
+	p.RecordGame(replicant.RoleHuman, true, ended)
+	p.RecordGame(replicant.RoleAI, false, ended)
+	p.RecordGame(replicant.RoleRogue, true, ended)
+	p.RecordGame(replicant.RoleSingularity, false, ended)
 
-	if p.GamesPlayed != 3 {
-		t.Errorf("GamesPlayed = %d, want 3", p.GamesPlayed)
+	if p.GamesPlayed != 4 {
+		t.Errorf("GamesPlayed = %d, want 4", p.GamesPlayed)
 	}
 	if p.GamesWon != 2 {
 		t.Errorf("GamesWon = %d, want 2", p.GamesWon)
 	}
-	if p.WinsAsLiberal != 1 || p.WinsAsHitler != 1 || p.WinsAsFascist != 0 {
-		t.Errorf("wins = lib:%d fas:%d hitler:%d",
-			p.WinsAsLiberal, p.WinsAsFascist, p.WinsAsHitler)
+	if p.WinsAsHuman != 1 || p.WinsAsRogue != 1 || p.WinsAsAI != 0 || p.WinsAsSingularity != 0 {
+		t.Errorf("wins = human:%d ai:%d rogue:%d singularity:%d",
+			p.WinsAsHuman, p.WinsAsAI, p.WinsAsRogue, p.WinsAsSingularity)
 	}
-	if p.TimesLiberal != 1 || p.TimesFascist != 1 || p.TimesHitler != 1 {
-		t.Errorf("times = lib:%d fas:%d hitler:%d",
-			p.TimesLiberal, p.TimesFascist, p.TimesHitler)
+	if p.TimesHuman != 1 || p.TimesAI != 1 || p.TimesRogue != 1 || p.TimesSingularity != 1 {
+		t.Errorf("times = human:%d ai:%d rogue:%d singularity:%d",
+			p.TimesHuman, p.TimesAI, p.TimesRogue, p.TimesSingularity)
 	}
 	if p.LastPlayedAt == nil {
 		t.Error("expected LastPlayedAt to be set")
@@ -58,8 +59,8 @@ func TestNewPassportEntry(t *testing.T) {
 	start := time.Now().Add(-time.Hour)
 	end := time.Now()
 	e := NewPassportEntry("U1", "G1", "P1",
-		replicant.RoleHitler, replicant.PartyFascist,
-		false, replicant.WinHitlerExecuted,
+		replicant.RoleRogue, replicant.PartyAI,
+		false, replicant.WinRogueExecuted,
 		3, 7, start, end)
 
 	if e.PK() != "PASSPORT#U1" {
@@ -68,7 +69,7 @@ func TestNewPassportEntry(t *testing.T) {
 	if e.SK() != "ENTRY#G1" {
 		t.Errorf("SK() = %q", e.SK())
 	}
-	if e.Role != replicant.RoleHitler {
+	if e.Role != replicant.RoleRogue {
 		t.Errorf("Role = %q", e.Role)
 	}
 	if e.Won {

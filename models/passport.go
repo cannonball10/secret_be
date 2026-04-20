@@ -27,15 +27,20 @@ type Passport struct {
 	GamesPlayed int    `json:"gamesPlayed"`
 	GamesWon    int    `json:"gamesWon"`
 
-	// Wins broken down by the role the user played during that game.
-	WinsAsLiberal int `json:"winsAsLiberal"`
-	WinsAsFascist int `json:"winsAsFascist"`
-	WinsAsHitler  int `json:"winsAsHitler"`
+	// Wins broken down by role. Field names follow the schema's
+	// canonical role identifiers (human / ai / rogue / singularity);
+	// the Replicant theme surfaces these as HUMAN / REPLICANT / PRIME /
+	// SINGULARITY in UI.
+	WinsAsHuman       int `json:"winsAsHuman"`
+	WinsAsAI          int `json:"winsAsAi"`
+	WinsAsRogue       int `json:"winsAsRogue"`
+	WinsAsSingularity int `json:"winsAsSingularity"`
 
 	// Role-appearance counts (how often the user was dealt each role).
-	TimesLiberal int `json:"timesLiberal"`
-	TimesFascist int `json:"timesFascist"`
-	TimesHitler  int `json:"timesHitler"`
+	TimesHuman       int `json:"timesHuman"`
+	TimesAI          int `json:"timesAi"`
+	TimesRogue       int `json:"timesRogue"`
+	TimesSingularity int `json:"timesSingularity"`
 
 	// Additional notable stats.
 	TimesExecuted          int        `json:"timesExecuted"`
@@ -63,20 +68,25 @@ func (p *Passport) GSIs() map[int]GSIKeyPair { return nil }
 func (p *Passport) RecordGame(role replicant.Role, won bool, endedAt time.Time) {
 	p.GamesPlayed++
 	switch role {
-	case replicant.RoleLiberal:
-		p.TimesLiberal++
+	case replicant.RoleHuman:
+		p.TimesHuman++
 		if won {
-			p.WinsAsLiberal++
+			p.WinsAsHuman++
 		}
-	case replicant.RoleFascist:
-		p.TimesFascist++
+	case replicant.RoleAI:
+		p.TimesAI++
 		if won {
-			p.WinsAsFascist++
+			p.WinsAsAI++
 		}
-	case replicant.RoleHitler:
-		p.TimesHitler++
+	case replicant.RoleRogue:
+		p.TimesRogue++
 		if won {
-			p.WinsAsHitler++
+			p.WinsAsRogue++
+		}
+	case replicant.RoleSingularity:
+		p.TimesSingularity++
+		if won {
+			p.WinsAsSingularity++
 		}
 	}
 	if won {
