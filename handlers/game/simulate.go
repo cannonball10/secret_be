@@ -2,6 +2,7 @@ package game
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -174,10 +175,12 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 		}
 	}
 
-	// Per-step trace so we can diagnose hangs in the wild. When a game
-	// gets stuck, the log tells us exactly which phase the sim is
-	// wedged on and who it's waiting for.
+	// Per-step trace + per-gov cable bookkeeping. When a game gets
+	// stuck, the log tells us exactly which phase the sim is wedged
+	// on and who it's waiting for. cableSubmittedForGov ensures bots
+	// drop one cable per Cable Phase, not one per stepSim poll.
 	var lastPhase replicant.GamePhase
+	var cableSubmittedForGov string
 	for step := 0; step < cfg.MaxSteps; step++ {
 		if !sleep(ctx, cfg.StepDelay) {
 			return
@@ -204,6 +207,44 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 			log.Error("loadPlayers failed", "err", err)
 			return
 		}
+
+		// Cable Phase is handled at the outer-loop level because it
+		// requires per-gov state (submitted-once) AND asymmetric
+		// behaviour depending on whether real players are at the table.
+		// Letting stepSim handle it would either stall the timer
+		// (re-submitting cables forever) or yank humans mid-write.
+		if game.Phase == replicant.PhaseCablePhase {
+			if cableSubmittedForGov != game.CurrentGovernmentID {
+				for _, p := range alivePlayers(players) {
+					if !isBotUser(p.UserID) {
+						continue
+					}
+					body := simCableBodies[rng.IntN(len(simCableBodies))]
+					if err := h.SendChat(ctx, game.GameID, p.PlayerID, ChannelCable, body); err != nil {
+						slog.Warn("sim cable submission failed", "err", err, "player", p.PlayerID)
+					}
+				}
+				cableSubmittedForGov = game.CurrentGovernmentID
+			}
+			// Advance the phase when the deadline has elapsed. In the
+			// fully-autonomous path we can skip the wait, since there
+			// are no humans typing — everyone already submitted.
+			deadlineReached := game.PhaseDeadline != nil &&
+				!h.clock.Now().Before(*game.PhaseDeadline)
+			if cfg.HumanSeats == 0 {
+				if err := h.ForceProgress(ctx, game.GameID, game.HostUserID); err != nil {
+					log.Error("cable force-progress failed", "err", err)
+					return
+				}
+			} else if deadlineReached {
+				if err := h.TimerExpired(ctx, game.GameID); err != nil && !errors.Is(err, ErrDeadlineNotReached) {
+					log.Error("cable timer tick failed", "err", err)
+					return
+				}
+			}
+			continue
+		}
+
 		if err := h.stepSim(ctx, game, players, rng); err != nil {
 			log.Error("step failed", "phase", game.Phase, "step", step, "err", err)
 			return
@@ -252,26 +293,6 @@ func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []
 		}
 		_, err := h.NominateChancellor(ctx, game.GameID, president.PlayerID, chancellor.PlayerID)
 		return err
-
-	case replicant.PhaseCablePhase:
-		// Each living bot submits one short canned cable per phase so
-		// the LLM ranker has something to score (and the host can see
-		// the leak UI exercised). Humans in the room still compose
-		// via the mobile app. Once every bot has dropped its cable,
-		// force-progress to the election vote without waiting for
-		// the full cable timer — keeps sim tempo brisk.
-		for _, p := range alivePlayers(players) {
-			if !isBotUser(p.UserID) {
-				continue
-			}
-			body := simCableBodies[rng.IntN(len(simCableBodies))]
-			if err := h.SendChat(ctx, game.GameID, p.PlayerID, ChannelCable, body); err != nil {
-				// Log but keep going — one bot's failed submission
-				// shouldn't stall the phase.
-				slog.Warn("sim cable submission failed", "err", err, "player", p.PlayerID)
-			}
-		}
-		return h.ForceProgress(ctx, game.GameID, game.HostUserID)
 
 	case replicant.PhaseElection:
 		// Cast a ja/nein vote for every bot that hasn't voted yet.
