@@ -2,7 +2,7 @@
 // apps/host/lib/api.ts but exposes only the endpoints a player
 // actually needs.
 
-import type { ChatChannel, Game, Government, Player, VoteChoice } from "@replicant/schema";
+import type { ChatChannel, ChatMessagePayload, Game, Government, Player, VoteChoice } from "@replicant/schema";
 import { API_ORIGIN } from "./env";
 
 export class ApiError extends Error {
@@ -67,6 +67,14 @@ export class MobileApi {
     body: string,
   ): Promise<{ status: string }> {
     return this.post(`/api/v1/games/${gameId}/player/dm`, { recipientPlayerId, body });
+  }
+
+  /** Fetch the caller's persisted DM history so threads survive
+   *  mobile reloads. SSE only replays from the moment the stream
+   *  opens, so without this reloaded devices would start with empty
+   *  threads. Returned messages are in oldest-first order. */
+  dmHistory(gameId: string): Promise<{ messages: ChatMessagePayload[] }> {
+    return this.get(`/api/v1/games/${gameId}/player/dms`);
   }
 
   private get<T>(path: string): Promise<T> {

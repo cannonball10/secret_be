@@ -3,10 +3,12 @@ package game
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/cannonball10/foundation/models"
+	"github.com/cannonball10/foundation/schemas/database"
 	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
@@ -164,6 +166,42 @@ func (h *GameHandler) SendChat(ctx context.Context, gameID, senderPlayerID strin
 		h.whisper(ctx, ev, p.PlayerID, payload)
 	}
 	return nil
+}
+
+// LoadDMHistory returns every persisted DM where the given player is
+// either author or recipient, sorted by SubmittedAt ascending. Used
+// by the mobile client on boot/reconnect to reconstruct DM threads
+// across page reloads — SSE alone only delivers messages from the
+// moment the stream opens.
+func (h *GameHandler) LoadDMHistory(ctx context.Context, gameID, playerID string) ([]*models.ChatMessage, error) {
+	prefix := "MSG#"
+	out, err := h.db.Query(ctx, nil, database.QueryInput{
+		PartitionKey: models.ChatMessageKeys.PK(gameID),
+		SortKey:      &database.SortKeyCondition{BeginsWith: &prefix},
+	}, database.QueryOptions{})
+	if err != nil {
+		return nil, err
+	}
+	mine := make([]*models.ChatMessage, 0, len(out.Models))
+	for _, m := range out.Models {
+		msg, ok := m.(*models.ChatMessage)
+		if !ok {
+			continue
+		}
+		if msg.Channel != string(ChannelDM) {
+			continue
+		}
+		if msg.AuthorPlayerID != playerID && msg.RecipientPlayerID != playerID {
+			continue
+		}
+		mine = append(mine, msg)
+	}
+	// Deterministic oldest-first order so clients can append to
+	// threads without re-sorting.
+	sort.Slice(mine, func(i, j int) bool {
+		return mine[i].SubmittedAt < mine[j].SubmittedAt
+	})
+	return mine, nil
 }
 
 // SendDM posts a direct message from sender to recipient. Both must be

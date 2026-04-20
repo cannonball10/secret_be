@@ -96,6 +96,14 @@ export default function MobileGamePage() {
   const [dmOpen, setDmOpen] = useState(false);
   const [dmThreads, setDmThreads] = useState<Record<string, ChatMessagePayload[]>>({});
   const [dmUnread, setDmUnread] = useState<Set<string>>(() => new Set());
+  // Transient toast for inbound DMs when the drawer is closed. Auto-
+  // dismisses after 4s; tapping it opens the drawer to that peer.
+  const [dmToast, setDmToast] = useState<{
+    peerId: string;
+    authorName: string;
+    body: string;
+    key: number;
+  } | null>(null);
 
   // Per-phase cable submission buffer. Keyed on governmentId so the
   // "queued" counter resets automatically at the next cable phase.
@@ -130,6 +138,15 @@ export default function MobileGamePage() {
           setFinalWinner(snap.game.winner ?? null);
           setFinalCondition(snap.game.winCondition ?? null);
         }
+        // DM history — persisted thread so reloads don't start empty.
+        // SSE only replays from the moment the stream attaches, so
+        // without this the drawer would show no prior conversation.
+        try {
+          const hist = await api.dmHistory(s.gameId);
+          setDmThreads(partitionDMsByPeer(hist.messages, s.playerId));
+        } catch {
+          // Non-fatal — the game proceeds fine without history.
+        }
         setLoadState("ready");
       } catch (e) {
         setLoadState("error");
@@ -163,16 +180,32 @@ export default function MobileGamePage() {
         setFinalWinner(snap.game.winner ?? null);
         setFinalCondition(snap.game.winCondition ?? null);
       }
+      if (myPlayerId) {
+        try {
+          const hist = await api.dmHistory(gameId);
+          setDmThreads(partitionDMsByPeer(hist.messages, myPlayerId));
+        } catch {
+          /* non-fatal */
+        }
+      }
     } catch (e) {
       console.warn("[reconcile] snapshot fetch failed", e);
     }
-  }, [gameId, token]);
+  }, [gameId, token, myPlayerId]);
 
   // hadErrorRef tracks whether we've seen an SSE error since the last
   // successful open. Reconciliation only fires on open events that
   // follow an error (i.e., actual reconnects), skipping the first
   // open and steady-state opens that never dropped.
   const hadErrorRef = useRef(false);
+
+  // Auto-dismiss the DM toast 4s after it appears. Keyed on `key` so
+  // consecutive toasts restart the timer cleanly.
+  useEffect(() => {
+    if (!dmToast) return;
+    const t = window.setTimeout(() => setDmToast(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [dmToast?.key]);
 
   // ── SSE ────────────────────────────────────────────────────────
   useStream({
@@ -388,6 +421,26 @@ export default function MobileGamePage() {
               next.add(peerId);
               return next;
             });
+            // Surface a transient toast for inbound DMs when the
+            // drawer isn't already visible so players notice incoming
+            // traffic without staring at the button. Skip if the
+            // drawer is open (they're already looking at messages).
+            if (!dmOpen) {
+              setDmToast({
+                peerId,
+                authorName: p.authorDisplayName,
+                body: p.body,
+                key: Date.now(),
+              });
+              // Best-effort vibration cue — no-op where unsupported.
+              if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+                try {
+                  navigator.vibrate(30);
+                } catch {
+                  /* ignore */
+                }
+              }
+            }
           }
           return;
         }
@@ -548,9 +601,9 @@ export default function MobileGamePage() {
             position: "fixed",
             right: 16,
             bottom: 56,
-            background: rpColors.stampBlue,
+            background: dmUnread.size > 0 ? rpColors.stampRed : rpColors.stampBlue,
             color: rpColors.paper3,
-            border: `2px solid ${rpColors.stampBlue}`,
+            border: `2px solid ${dmUnread.size > 0 ? rpColors.stampRed : rpColors.stampBlue}`,
             padding: "10px 14px",
             fontFamily: "var(--font-display)",
             fontSize: 13,
@@ -559,6 +612,7 @@ export default function MobileGamePage() {
             boxShadow: "3px 3px 0 rgba(28,26,21,0.35)",
             cursor: "pointer",
             zIndex: 20,
+            animation: dmUnread.size > 0 ? "rpPulse 1.4s ease-in-out infinite" : undefined,
           }}
         >
           ◼ DIRECT CHANNELS
@@ -566,15 +620,65 @@ export default function MobileGamePage() {
             <span
               style={{
                 marginLeft: 8,
-                background: rpColors.stampRed,
-                color: rpColors.paper3,
+                background: rpColors.paper3,
+                color: rpColors.stampRed,
                 padding: "1px 6px",
                 fontSize: 11,
+                fontWeight: 700,
               }}
             >
               {dmUnread.size}
             </span>
           )}
+        </button>
+      )}
+
+      {dmToast && me && !dmOpen && (
+        <button
+          onClick={() => {
+            setDmOpen(true);
+            setDmToast(null);
+          }}
+          aria-label="Open this direct message"
+          style={{
+            position: "fixed",
+            left: 12,
+            right: 12,
+            top: 12,
+            zIndex: 60,
+            background: rpColors.ink,
+            color: rpColors.paper3,
+            border: `2px solid ${rpColors.stampRed}`,
+            padding: "10px 14px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 2,
+            boxShadow: "3px 3px 0 rgba(0,0,0,0.45)",
+            cursor: "pointer",
+            textAlign: "left",
+            animation: "rpToastIn 0.22s ease-out",
+          }}
+        >
+          <span
+            className="t-eyebrow"
+            style={{ color: rpColors.stampRed, fontSize: 9, letterSpacing: 1.4 }}
+          >
+            ◼ INCOMING CABLE · {dmToast.authorName.toUpperCase()}
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-typewriter)",
+              fontSize: 13,
+              color: rpColors.paper3,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: "100%",
+            }}
+          >
+            {dmToast.body}
+          </span>
         </button>
       )}
 
@@ -1602,6 +1706,22 @@ function targetVerb(t: NonNullable<Game["pendingActionType"]>): string {
     default:
       return "TARGET";
   }
+}
+
+/** Partition an oldest-first DM history array into per-peer threads.
+ *  The "peer" of a message is whichever party isn't me — the author
+ *  for inbound, the recipient for my own echoes. */
+function partitionDMsByPeer(
+  msgs: ChatMessagePayload[],
+  meId: string,
+): Record<string, ChatMessagePayload[]> {
+  const out: Record<string, ChatMessagePayload[]> = {};
+  for (const m of msgs) {
+    const peer = m.authorPlayerId === meId ? m.recipientPlayerId ?? "" : m.authorPlayerId;
+    if (!peer) continue;
+    (out[peer] ||= []).push(m);
+  }
+  return out;
 }
 
 function titleCase(s: string): string {

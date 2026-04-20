@@ -312,6 +312,38 @@ func (s *Server) handleResolveVeto(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"status": "veto resolved"})
 }
 
+// handleDMHistory returns the caller's persisted DMs for this game so
+// the mobile client can reconstruct threads after a reload. Only the
+// caller's own conversations (as author or recipient) come back; no
+// cross-player leakage.
+func (s *Server) handleDMHistory(c *gin.Context) {
+	gameID := c.Param("gameId")
+	player, err := s.currentPlayer(c, gameID)
+	if err != nil {
+		return
+	}
+	msgs, err := s.engine.LoadDMHistory(c.Request.Context(), gameID, player.PlayerID)
+	if err != nil {
+		writeEngineError(c, err)
+		return
+	}
+	// Map to the wire payload shape so the client can drop these
+	// straight into the same thread store the SSE handler uses.
+	out := make([]game.ChatMessagePayload, 0, len(msgs))
+	for _, m := range msgs {
+		out = append(out, game.ChatMessagePayload{
+			MessageID:         m.MessageID,
+			Channel:           game.ChatChannel(m.Channel),
+			AuthorPlayerID:    m.AuthorPlayerID,
+			AuthorDisplayName: m.AuthorDisplayName,
+			Body:              m.Body,
+			SentAt:            m.SubmittedAt,
+			RecipientPlayerID: m.RecipientPlayerID,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"messages": out})
+}
+
 func (s *Server) handleDMSend(c *gin.Context) {
 	var body dmReq
 	if err := c.ShouldBindJSON(&body); err != nil {
