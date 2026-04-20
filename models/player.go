@@ -44,7 +44,7 @@ type Player struct {
 	IsConnected bool `json:"isConnected"`
 
 	// Country is the world-power delegation this player represents on
-	// the Earth Policy Committee. Assigned at StartGame from a rotating
+	// the Planetary Committee. Assigned at StartGame from a rotating
 	// pool keyed on seat so every table has a distinct set. CountryCode
 	// is the ISO-3166-1 alpha-2 code used for the passport stamp UI;
 	// CountryName is the full display string. Both are empty while the

@@ -179,7 +179,7 @@ type GameEndedPayload struct {
 }
 
 // NarratorSpeakPayload carries a synthesised narrator utterance. The
-// Department "speaks" over a game-wide broadcast envelope; host
+// Committee "speaks" over a game-wide broadcast envelope; host
 // devices play AudioURL (a data-URL embedding the MP3) and render
 // Script as typewriter text. Mobile clients can optionally render the
 // transcript without playing audio.
@@ -204,8 +204,8 @@ type CablePhaseOpenedPayload struct {
 
 // CablePhaseClosedPayload announces the end of a Cable Phase. Reason
 // mirrors ProgressReason (timeout / forced / all_voted-equivalent).
-// LeakedMessageID references the cable (if any) the Department chose
-// to broadcast; empty when the Department went silent or no cables
+// LeakedMessageID references the cable (if any) the Committee chose
+// to broadcast; empty when the Committee went silent or no cables
 // were submitted.
 type CablePhaseClosedPayload struct {
 	GovernmentID     string         `json:"governmentId"`
@@ -215,7 +215,7 @@ type CablePhaseClosedPayload struct {
 }
 
 // CableLeakedPayload carries the full body of the cable the narrator
-// just broadcast — including a flag indicating whether the Department
+// just broadcast — including a flag indicating whether the Committee
 // chose silence instead of a leak. When Silenced is true, Body and
 // Author are empty; the narrator_speak envelope fired alongside
 // announces the silence verbally.

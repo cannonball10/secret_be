@@ -19,12 +19,12 @@ var simCableBodies = []string{
 	"I move we adjourn for a brief recess.",
 	"The prior tribunal's findings still give me pause.",
 	"vote nein on this government. too risky.",
-	"Anyone else uncomfortable with Subject 03's pattern here.",
-	"No objection from this station.",
+	"Anyone else uncomfortable with Delegate 03's pattern here.",
+	"No objection from this delegation.",
 	"we need to flip jordan before the third enactment",
 	"Can we get a clarification on the last executive order.",
-	"The Department's silence is itself a signal.",
-	"Subject 05 is behaving exactly like the last replicant.",
+	"The Committee's silence is itself a signal.",
+	"Delegate 05 is behaving exactly like the last replicant.",
 	"Fine. Pass it. We'll see what the board does.",
 }
 

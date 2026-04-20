@@ -1,8 +1,8 @@
-// RPSeal — the Department of Human Affairs stamp.
+// RPSeal — the Planetary Committee stamp.
 //
-// Circular mark: two concentric rings, inner monogram "R" over a
-// tiny "REPLICANT" label, text-on-path around the ring reading
-// "DEPT. OF HUMAN AFFAIRS · FORM R-07 · CLASSIFIED ·". Rendered with
+// Circular mark: two concentric rings, inner monogram "P" over a
+// tiny "PLAN. COMMITTEE" label, text-on-path around the ring reading
+// "PLANETARY COMMITTEE · ACCORD R-07 · CLASSIFIED ·". Rendered with
 // mix-blend-mode: multiply so it bleeds into the surface like ink.
 
 import { useId } from "react";
@@ -24,7 +24,7 @@ export function RPSeal({ size = 120, color = rpColors.stampRed, rotate = -6 }: R
       height={size}
       viewBox="0 0 120 120"
       style={{ transform: `rotate(${rotate}deg)`, mixBlendMode: "multiply", opacity: 0.9 }}
-      aria-label="Department of Human Affairs seal"
+      aria-label="Planetary Committee seal"
     >
       <defs>
         <path
@@ -43,7 +43,7 @@ export function RPSeal({ size = 120, color = rpColors.stampRed, rotate = -6 }: R
         fill={color}
       >
         <textPath href={`#${pathId}`} startOffset="2%">
-          DEPT. OF HUMAN AFFAIRS · FORM R-07 · CLASSIFIED ·
+          PLANETARY COMMITTEE · ACCORD R-07 · CLASSIFIED ·
         </textPath>
       </text>
       <text

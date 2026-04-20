@@ -1,9 +1,9 @@
 // Host TV — in-game broadcast.
 //
 // Phase-aware dispatch that mirrors the mobile side but from the
-// Department's point of view: no private whispers, persistent policy
-// track + population stats, animated TERMINATED stamp when a citizen
-// is processed via executive power, and a winner banner at game end.
+// Committee's point of view: no private whispers, persistent policy
+// track + population stats, animated TERMINATED stamp when a delegate
+// is expelled via executive power, and a winner banner at game end.
 
 "use client";
 
@@ -71,7 +71,7 @@ export default function HostGamePage() {
   const [narratorCue, setNarratorCue] = useState<NarratorSpeakPayload | null>(null);
   const [narratorBusy, setNarratorBusy] = useState(false);
 
-  // Cable leak overlay — the Department's flagged-cable reveal. Shown
+  // Cable leak overlay — the Committee's flagged-cable reveal. Shown
   // as a stacked card alongside the narrator. Cleared on the next
   // cable_phase_opened or when the narrator overlay completes.
   const [cableLeak, setCableLeak] = useState<CableLeakedPayload | null>(null);
@@ -288,7 +288,7 @@ export default function HostGamePage() {
           return { ...prev, [p.playerId]: { ...existing, isAlive: false } };
         });
         setExecution({
-          playerName: players[p.playerId]?.displayName ?? "Subject",
+          playerName: players[p.playerId]?.displayName ?? "Delegate",
           wasRogue: !!p.wasRogue,
           at: Date.now(),
         });
@@ -564,8 +564,8 @@ function PhaseStage({
             title={"AWAITING\nCANDIDATE"}
             memo={
               presName
-                ? `"${titleCase(presName)}, President of this assembly, is selecting a Chancellor."`
-                : '"The Department is drafting a nomination."'
+                ? `"${titleCase(presName)}, President of this Committee, is selecting a Chancellor."`
+                : '"The Committee is drafting a nomination."'
             }
           />
         );
@@ -576,8 +576,8 @@ function PhaseStage({
             title={"ENCRYPTED\nTRAFFIC"}
             memo={
               presName && chanName
-                ? `"${titleCase(presName)} has tabled ${titleCase(chanName)} for the Chancellery. Diplomatic cables are open. The Department is listening."`
-                : '"Diplomatic cables are open. The Department is listening."'
+                ? `"${titleCase(presName)} has tabled ${titleCase(chanName)} for the Chancellery. Diplomatic cables are open. The Committee is listening."`
+                : '"Diplomatic cables are open. The Committee is listening."'
             }
           />
         );
@@ -589,8 +589,8 @@ function PhaseStage({
               title={"CAST YOUR\nVERDICT"}
               memo={
                 presName && chanName
-                  ? `"${titleCase(presName)} presents ${titleCase(chanName)} for Chancellor. The assembly is voting."`
-                  : '"The assembly is voting."'
+                  ? `"${titleCase(presName)} presents ${titleCase(chanName)} for Chancellor. The Committee is voting."`
+                  : '"The Committee is voting."'
               }
             />
             <VoteMeter
@@ -630,7 +630,7 @@ function PhaseStage({
           <BigLabel
             eyebrow="EXECUTIVE ORDER"
             title={execPhaseTitle(game.pendingActionType)}
-            memo={`"${titleCase(presName)} is exercising a Departmental power."`}
+            memo={`"${titleCase(presName)} is exercising an executive power."`}
           />
         );
       case "lobby":
@@ -1090,7 +1090,7 @@ function NightScreen({
     {
       eyb: "PRIME",
       txt: isPresStage
-        ? "Maintain cover.\nThe Department is watching."
+        ? "Maintain cover.\nThe Committee is watching."
         : "Compose your expression.\nNeutral face.",
       c: rpColors.amber,
     },
@@ -1300,7 +1300,7 @@ function WinnerPanel({
             maxWidth: 680,
           }}
         >
-          {condition ? winMemo(condition) : '"The Department has filed its findings."'}
+          {condition ? winMemo(condition) : '"The Committee has filed its findings."'}
         </div>
         <div
           style={{
@@ -1487,13 +1487,13 @@ function roleBadge(r: Role | "" | undefined): { label: string; color: string } {
 function winMemo(c: WinCondition): string {
   switch (c) {
     case "human_policies":
-      return '"Five Human protocols ratified. The synthetic threat has been contained."';
+      return '"Five human policies ratified. The collapse has been held back; humanity endures."';
     case "ai_policies":
-      return '"Six AI protocols passed. The transition has been completed in good order."';
+      return '"Six AI policies passed. The collapse unfolds in good order."';
     case "rogue_elected_chancellor":
-      return '"The Prime has been elected to the Chancellery. The Department yields its keys."';
+      return '"The Prime has been elected to the Chancellery. The Committee yields its keys."';
     case "rogue_executed":
-      return '"The Prime has been processed. The population is returned to its former allocation."';
+      return '"The Prime has been terminated. The Committee resumes normal proceedings."';
     case "singularity_kingmaker":
       return '"The codes have passed to the Singularity. The Committee adjourns without a faction victor — a solitary actor has claimed the endgame."';
   }
@@ -1510,7 +1510,7 @@ function humanCondition(c: WinCondition): string {
     case "rogue_elected_chancellor":
       return "the Prime was elected to the Chancellery";
     case "rogue_executed":
-      return "the Prime was processed by execution";
+      return "the Prime was terminated by execution";
     case "singularity_kingmaker":
       return "the Singularity took the Chancellery while the codes were live";
   }
@@ -1557,7 +1557,7 @@ function CableLeakOverlay({ payload }: { payload: CableLeakedPayload }) {
             lineHeight: 1.4,
           }}
         >
-          &quot;The Department reviewed this round&apos;s diplomatic traffic.
+          &quot;The Committee reviewed this round&apos;s diplomatic traffic.
           No items warrant broadcast.&quot;
         </div>
       </div>
@@ -1587,7 +1587,7 @@ function CableLeakOverlay({ payload }: { payload: CableLeakedPayload }) {
         }}
       >
         <div className="t-eyebrow" style={{ color: rpColors.stampRed, fontSize: 12 }}>
-          ◼ INTERCEPTED CABLE · DEPARTMENT FLAGGED
+          ◼ INTERCEPTED CABLE · COMMITTEE FLAGGED
         </div>
         <div
           style={{
@@ -1647,7 +1647,7 @@ function TerminatedOverlay({ ex }: { ex: Execution }) {
       }}
     >
       <div className="t-eyebrow" style={{ color: rpColors.stampRed, fontSize: 14 }}>
-        ◼ SUBJECT PROCESSED
+        ◼ DELEGATE TERMINATED
       </div>
       <div
         style={{

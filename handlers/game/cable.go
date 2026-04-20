@@ -93,7 +93,7 @@ func (h *GameHandler) runCableLeak(ctx context.Context, game *models.Game) cable
 		return result
 	}
 
-	// Silence roll: if the Department decided to go silent, emit a
+	// Silence roll: if the Committee decided to go silent, emit a
 	// silence narrator script but no cable_leaked payload with a
 	// quoted body.
 	silenced := h.rng.Float64() < game.Rules.CableLeakSilenceChance
@@ -132,7 +132,7 @@ func (h *GameHandler) runCableLeak(ctx context.Context, game *models.Game) cable
 	}
 
 	// Persist the Leaked flag + score so the post-game passport can
-	// surface which cables the Department flagged.
+	// surface which cables the Committee flagged.
 	top.Leaked = true
 	top.SubversionScore = topScore
 	if err := h.db.Upsert(ctx, nil, top); err != nil {

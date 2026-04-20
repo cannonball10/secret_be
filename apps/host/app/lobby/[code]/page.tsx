@@ -25,7 +25,7 @@ import { useStream } from "@/lib/useStream";
 const MIN_PLAYERS = 5;
 const MAX_PLAYERS = 10;
 
-// Maps a subject number to a consistent accent color so every seat
+// Maps a delegate number to a consistent accent color so every seat
 // keeps the same portrait color between re-renders.
 const ACCENT_PALETTE = [
   rpColors.ink,
@@ -194,7 +194,7 @@ export default function HostLobbyPage() {
           >
             <div>
               <div className="t-eyebrow" style={{ color: rpColors.cyan, marginBottom: 14 }}>
-                ◼ DEPT. OF HUMAN AFFAIRS · FORM R-07
+                ◼ PLANETARY COMMITTEE · ACCORD R-07
               </div>
               <div
                 style={{
@@ -218,7 +218,7 @@ export default function HostLobbyPage() {
                 className="t-memo"
                 style={{ color: rpColors.paper3, marginTop: 16, fontSize: 18, opacity: 0.8, maxWidth: 520 }}
               >
-                A Human Verification Procedure, in Eight Rounds.
+                A Planetary Committee Session, in Eight Rounds.
               </div>
             </div>
 
@@ -481,10 +481,10 @@ export default function HostLobbyPage() {
                 }}
               >
                 {ready
-                  ? '"The Department accepts your convened assembly. Deploy when ready."'
-                  : `"Awaiting ${MIN_PLAYERS - seated.length} further citizen${
+                  ? '"The Committee accepts your convened delegation. Deploy when ready."'
+                  : `"Awaiting ${MIN_PLAYERS - seated.length} further delegate${
                       MIN_PLAYERS - seated.length === 1 ? "" : "s"
-                    }. The Department does not tolerate tardiness."`}
+                    }. The Committee does not tolerate tardiness."`}
               </div>
               <button
                 onClick={deploy}

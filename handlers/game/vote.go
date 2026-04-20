@@ -142,7 +142,7 @@ func (h *GameHandler) resolveElection(ctx context.Context, game *models.Game, pl
 // therefore lives in applyEnactedPolicy.
 func (h *GameHandler) onElectionPassed(ctx context.Context, game *models.Game, gov *models.Government, players []*models.Player) (*models.Government, bool, error) {
 	// Codes-transferred chancellor win conditions. Once the AI cabal
-	// has pushed the Earth Policy Committee past the codes-transfer
+	// has pushed the Planetary Committee past the codes-transfer
 	// threshold, electing a compromised Chancellor hands them the
 	// nuclear codes. Two mutually exclusive winners are possible:
 	//

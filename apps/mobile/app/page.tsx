@@ -1,4 +1,4 @@
-// Mobile entry. A citizen arriving without a QR scan types the
+// Mobile entry. A delegate arriving without a QR scan types the
 // session code + their name here. Both feed into /join/CODE which is
 // the shared join flow regardless of how they got there.
 
@@ -24,7 +24,7 @@ export default function MobileHomePage() {
   return (
     <main style={{ padding: "40px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
       <div className="t-eyebrow" style={{ color: "var(--stamp-red)" }}>
-        ◼ DEPT. OF HUMAN AFFAIRS · FORM R-07
+        ◼ PLANETARY COMMITTEE · ACCORD R-07
       </div>
       <div
         style={{
@@ -46,7 +46,7 @@ export default function MobileHomePage() {
         <span style={{ position: "relative" }}>REPLICANT</span>
       </div>
       <p className="t-memo" style={{ fontSize: 15, color: "var(--ink-soft)", margin: 0 }}>
-        Submit the six-character session code provided by the host display.
+        Submit the six-character credential provided by the Committee chair.
       </p>
 
       <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -94,7 +94,7 @@ export default function MobileHomePage() {
         className="t-memo"
         style={{ fontSize: 13, color: "var(--ink-faded)", marginTop: "auto" }}
       >
-        &quot;The Department appreciates your cooperation.&quot;
+        &quot;The Committee appreciates your cooperation.&quot;
       </div>
     </main>
   );

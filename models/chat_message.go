@@ -40,7 +40,7 @@ type ChatMessage struct {
 	// SubmittedAt is the game-clock value (via h.clock) that the
 	// engine injects so tests with FakeClock stay deterministic.
 	SubmittedAt string `json:"submittedAt"`
-	// Leaked flags the one cable the Department broadcast at
+	// Leaked flags the one cable the Committee broadcast at
 	// phase-end. Set by the LLM-ranker path in step 3c.
 	Leaked bool `json:"leaked,omitempty"`
 	// SubversionScore is the LLM's rating (0-10) of how provocative

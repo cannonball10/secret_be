@@ -64,7 +64,7 @@ export const Player = Timestamps.extend({
   role: Role.optional(),
   party: Party.optional(),
   /** ISO-3166-1 alpha-2 code of the delegation this player represents
-   *  on the Earth Policy Committee. Assigned at StartGame. */
+   *  on the Planetary Committee. Assigned at StartGame. */
   countryCode: z.string().optional(),
   /** Full display name of the delegation (e.g. "United States"). */
   countryName: z.string().optional(),

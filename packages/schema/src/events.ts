@@ -196,7 +196,7 @@ export type CablePhaseClosedPayload = z.infer<typeof CablePhaseClosedPayload>;
 
 // CableLeakedPayload — the narrator's phase-end broadcast. When
 // `silenced` is true the body/author are empty and the paired
-// narrator_speak envelope says the Department reviewed the traffic
+// narrator_speak envelope says the Committee reviewed the traffic
 // and found nothing worth flagging.
 export const CableLeakedPayload = z.object({
   governmentId: z.string(),
@@ -210,7 +210,7 @@ export const CableLeakedPayload = z.object({
 export type CableLeakedPayload = z.infer<typeof CableLeakedPayload>;
 
 /**
- * NarratorSpeakPayload — the Department's synthesised utterance.
+ * NarratorSpeakPayload — the Committee's synthesised utterance.
  * `audioUrl` is a `data:audio/mpeg;base64,…` URL; host clients play
  * it directly (and may GET /api/v1/narrator/audio/:audioId as a
  * fallback if they need to re-fetch). Mobile clients may render only

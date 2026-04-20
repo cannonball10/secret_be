@@ -66,7 +66,7 @@ type RulesConfig struct {
 	CablePhaseDurationSec int `json:"cablePhaseDurationSec"`
 
 	// CableLeakSilenceChance is the probability [0, 1] that the
-	// Department will go silent at phase-end — i.e. broadcast "no
+	// Committee will go silent at phase-end — i.e. broadcast "no
 	// traffic worth flagging" instead of leaking the top-scored
 	// cable. Small non-zero values (~0.1-0.2) are the sweet spot:
 	// enough uncertainty to keep players guessing whether their

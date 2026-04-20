@@ -120,7 +120,7 @@ export function ChatDrawer({
                 padding: "28px 12px",
               }}
             >
-              &quot;This channel is empty. The Department has not yet intercepted any
+              &quot;This channel is empty. The Committee has not yet intercepted any
               transmissions among kin.&quot;
             </div>
           )}
@@ -290,7 +290,7 @@ export function ChatDrawer({
               letterSpacing: 1.3,
             }}
           >
-            MESSAGES ARE ARCHIVED BY THE DEPARTMENT AFTER CYCLE END
+            MESSAGES ARE ARCHIVED BY THE COMMITTEE AFTER CYCLE END
           </div>
         </div>
       </div>
