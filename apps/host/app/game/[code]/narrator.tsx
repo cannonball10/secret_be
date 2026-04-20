@@ -19,9 +19,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { rpColors } from "@replicant/tokens";
 import type { NarratorSpeakPayload } from "@replicant/schema";
+import { getVolume, subscribeVolume } from "@/lib/volume";
 
 const BAR_COUNT = 80;
 const CYAN_BARS = 60;
+
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 interface Props {
   payload: NarratorSpeakPayload;
@@ -68,8 +71,18 @@ export function HostNarrator({ payload, onComplete, onSkip }: Props) {
   const ctxRef = useRef<AudioContext | null>(null);
   const srcRef = useRef<AudioBufferSourceNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const endedRef = useRef(false);
+
+  // Subscribe to volume-setting changes so sliders in the settings
+  // modal apply in real time while a narration is playing.
+  useEffect(() => {
+    return subscribeVolume((v) => {
+      const gain = gainRef.current;
+      if (gain) gain.gain.value = clamp01(v.master * v.narrator);
+    });
+  }, []);
 
   const tearDown = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -82,11 +95,13 @@ export function HostNarrator({ payload, onComplete, onSkip }: Props) {
     try {
       srcRef.current?.disconnect();
       analyserRef.current?.disconnect();
+      gainRef.current?.disconnect();
     } catch {
       // no-op
     }
     srcRef.current = null;
     analyserRef.current = null;
+    gainRef.current = null;
     try {
       void ctxRef.current?.close();
     } catch {
@@ -144,8 +159,13 @@ export function HostNarrator({ payload, onComplete, onSkip }: Props) {
 
     const source = ctx.createBufferSource();
     source.buffer = audioBuf;
-    source.connect(analyser);
+    const gain = ctx.createGain();
+    const vol = getVolume();
+    gain.gain.value = clamp01(vol.master * vol.narrator);
+    source.connect(gain);
+    gain.connect(analyser);
     analyser.connect(ctx.destination);
+    gainRef.current = gain;
 
     source.onended = () => {
       if (endedRef.current) return;

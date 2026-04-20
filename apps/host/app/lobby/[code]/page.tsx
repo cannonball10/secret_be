@@ -21,6 +21,7 @@ import { HostApi, ApiError } from "@/lib/api";
 import { deviceId } from "@/lib/deviceId";
 import { clearSession, loadSession, saveSession } from "@/lib/session";
 import { useStream } from "@/lib/useStream";
+import { SettingsButton } from "./settings";
 
 const MIN_PLAYERS = 5;
 const MAX_PLAYERS = 10;
@@ -155,6 +156,11 @@ export default function HostLobbyPage() {
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <RPTVChrome title="CANDIDATE INTAKE" nodeId={`NODE ${code.slice(0, 6)}`} phase="PRE-DEPLOY">
+        <SettingsButton
+          game={game}
+          token={token}
+          onRulesUpdated={(g) => setGame(g)}
+        />
         {err && (
           <div
             style={{

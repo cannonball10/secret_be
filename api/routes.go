@@ -47,6 +47,7 @@ func (s *Server) registerRoutes() {
 	host.POST("/force-progress", s.handleForceProgress)
 	host.POST("/timer-tick", s.handleTimerTick)
 	host.POST("/narrate", s.handleNarrate)
+	host.PUT("/rules", s.handleUpdateRules)
 
 	// Narrator audio cache — broadcast scope, any authenticated
 	// device may fetch a cue's MP3 by id.

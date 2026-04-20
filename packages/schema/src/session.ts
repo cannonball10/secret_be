@@ -19,6 +19,31 @@ const Timestamps = z.object({
   updatedAt: z.string(),
 });
 
+// CablePhaseMode mirrors schemas/replicant.CablePhaseMode.
+export const CablePhaseMode = z.enum(["disabled", "every_round", "on_activation"]);
+export type CablePhaseMode = z.infer<typeof CablePhaseMode>;
+
+// RulesConfig — the tunable rule-set stamped onto a Game at create
+// time. Mirrors schemas/replicant/rules.go; the host settings panel
+// PUTs a full RulesConfig back via /host/rules to mutate a lobby's
+// rules before StartGame.
+export const RulesConfig = z.object({
+  minPlayers: z.number(),
+  maxPlayers: z.number(),
+  humanProtocolsInDeck: z.number(),
+  aiProtocolsInDeck: z.number(),
+  humanPoliciesToWin: z.number(),
+  aiPoliciesToWin: z.number(),
+  codesTransferAt: z.number(),
+  electionTrackerLimit: z.number(),
+  vetoUnlockAt: z.number(),
+  enableSingularity: z.boolean().optional(),
+  cablePhaseMode: CablePhaseMode.optional(),
+  cablePhaseDurationSec: z.number().optional(),
+  cableLeakSilenceChance: z.number().optional(),
+});
+export type RulesConfig = z.infer<typeof RulesConfig>;
+
 export const Game = Timestamps.extend({
   gameId: z.string(),
   joinCode: z.string(),
@@ -44,6 +69,7 @@ export const Game = Timestamps.extend({
   pendingActionId: z.string().optional(),
   startedAt: z.string().nullish(),
   endedAt: z.string().nullish(),
+  rules: RulesConfig.optional(),
 });
 export type Game = z.infer<typeof Game>;
 

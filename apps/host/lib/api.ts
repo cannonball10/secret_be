@@ -6,7 +6,7 @@
 // screens may have different identities (e.g. anonymous boot vs.
 // a logged-in host).
 
-import type { Game, NarratorSpeakPayload, Player } from "@replicant/schema";
+import type { Game, NarratorSpeakPayload, Player, RulesConfig } from "@replicant/schema";
 import { API_ORIGIN } from "./env";
 
 export interface ApiClientOptions {
@@ -44,6 +44,11 @@ export class HostApi {
     return this.post(`/api/v1/games/${gameId}/host/force-progress`);
   }
 
+  /** Replace a lobby's RulesConfig. Host-only, lobby-only on the server. */
+  updateRules(gameId: string, rules: RulesConfig): Promise<{ game: Game }> {
+    return this.put<{ game: Game }>(`/api/v1/games/${gameId}/host/rules`, { rules });
+  }
+
   /**
    * Generate a narrator utterance for the given cue kind and broadcast
    * it. Custom cues (`cue: "custom"`) take `text` verbatim and skip
@@ -68,6 +73,10 @@ export class HostApi {
 
   private post<T>(path: string, body?: unknown): Promise<T> {
     return this.request<T>("POST", path, body);
+  }
+
+  private put<T>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>("PUT", path, body);
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {

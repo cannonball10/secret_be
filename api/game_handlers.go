@@ -56,6 +56,14 @@ type chatReq struct {
 	Body    string `json:"body" binding:"required"`
 }
 
+// updateRulesReq carries a full RulesConfig the host wants stamped
+// onto a lobby. Clients build this by fetching the current game,
+// mutating one field on its `rules`, and POSTing the whole struct
+// back — diffing is left to the client to keep the server stateless.
+type updateRulesReq struct {
+	Rules replicant.RulesConfig `json:"rules" binding:"required"`
+}
+
 // --- lobby -----------------------------------------------------------------
 
 func (s *Server) handleCreateGame(c *gin.Context) {
@@ -141,6 +149,25 @@ func (s *Server) handleGetGame(c *gin.Context) {
 func (s *Server) handleStartGame(c *gin.Context) {
 	gameID := c.Param("gameId")
 	g, err := s.engine.StartGame(c.Request.Context(), gameID, userID(c))
+	if err != nil {
+		writeEngineError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"game": g})
+}
+
+// handleUpdateRules accepts a full RulesConfig from the host and
+// replaces the lobby's stored rules after validation. The response is
+// the full updated game so the client can re-render without a follow-up
+// GET.
+func (s *Server) handleUpdateRules(c *gin.Context) {
+	var body updateRulesReq
+	if err := c.ShouldBindJSON(&body); err != nil {
+		badRequest(c, err)
+		return
+	}
+	gameID := c.Param("gameId")
+	g, err := s.engine.UpdateRules(c.Request.Context(), gameID, userID(c), body.Rules)
 	if err != nil {
 		writeEngineError(c, err)
 		return
