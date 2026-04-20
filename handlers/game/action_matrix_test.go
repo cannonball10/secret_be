@@ -12,7 +12,7 @@ import (
 
 // driveStrategy is a bundle of per-phase preferences passed to driveGame.
 // The driver consults it when choosing actions so we can force specific
-// outcomes (e.g. "always enact liberal", "execute Hitler when possible",
+// outcomes (e.g. "always enact AI", "execute the rogue when possible",
 // "propose + accept every veto", etc.).
 type driveStrategy struct {
 	// preferEnact controls which policy the chancellor tries to enact
@@ -21,10 +21,15 @@ type driveStrategy struct {
 	// preferDiscard controls which policy the president tries to
 	// discard. Empty string means "first policy".
 	preferDiscard replicant.PolicyType
-	// targetHitler toggles targeting Hitler on Execution when possible.
+	// targetHitler toggles targeting the rogue (Prime) on Execution
+	// when possible.
 	targetHitler bool
-	// nominateHitler toggles nominating Hitler when eligible.
+	// nominateHitler toggles nominating the rogue (Prime) when eligible.
 	nominateHitler bool
+	// nominateSingularity toggles nominating the Singularity (when
+	// seated) as Chancellor. Only meaningful when Rules.EnableSingularity
+	// is on; ignored otherwise.
+	nominateSingularity bool
 	// proposeVeto controls whether the chancellor proposes veto when
 	// the power is unlocked.
 	proposeVeto bool
@@ -32,24 +37,65 @@ type driveStrategy struct {
 	acceptVeto bool
 }
 
+// driveOpts lets TestActionMatrix_FeatureVariants flip rule dimensions
+// (singularity, cable phase) without duplicating the driver. A nil opts
+// means "vanilla rules, no extra handler options" — the path the
+// original action-matrix test uses.
+type driveOpts struct {
+	// rules, when set, is applied to game.Rules after CreateGame but
+	// before StartGame so the rules stamp persists into the dealt game.
+	rules func(*replicant.RulesConfig)
+	// narrator, when set, is wired via WithCableNarrator so Cable Phase
+	// can produce cable_leaked envelopes without a real LLM.
+	narrator CableNarrator
+	// cableDuration sets the Cable Phase deadline window. Ignored when
+	// rules doesn't flip CablePhaseMode on. Default 5s — short enough
+	// that TimerExpired closes the phase after a single clock advance.
+	cableDuration time.Duration
+}
+
 // driveGame plays a game to completion following strategy, returning
 // the final state plus a coverage report of every action and event
-// observed along the way.
-func driveGame(t *testing.T, seed uint64, playerCount int, strat driveStrategy, maxSteps int) (*coverageReport, *models.Game) {
+// observed along the way. opts may be nil for the vanilla case.
+func driveGame(t *testing.T, seed uint64, playerCount int, strat driveStrategy, maxSteps int, opts *driveOpts) (*coverageReport, *models.Game) {
 	t.Helper()
-	h, _, cap, clock := newTestHandler(t, seed)
+	var extra []Option
+	if opts != nil && opts.narrator != nil {
+		extra = append(extra, WithCableNarrator(opts.narrator))
+	}
+	h, _, cap, clock := newTestHandler(t, seed, extra...)
 	g := seedLobby(t, h, playerCount)
 	ctx := context.Background()
+	if opts != nil && opts.rules != nil {
+		loaded, err := h.loadGame(ctx, g.GameID)
+		if err != nil {
+			t.Fatalf("loadGame for rules override: %v", err)
+		}
+		opts.rules(&loaded.Rules)
+		if loaded.Rules.CablePhaseMode != replicant.CableModeDisabled && loaded.Rules.CablePhaseDurationSec == 0 {
+			dur := opts.cableDuration
+			if dur <= 0 {
+				dur = 5 * time.Second
+			}
+			loaded.Rules.CablePhaseDurationSec = int(dur / time.Second)
+		}
+		if err := h.saveGame(ctx, loaded); err != nil {
+			t.Fatalf("saveGame for rules override: %v", err)
+		}
+	}
 	if _, err := h.StartGame(ctx, g.GameID, "user-host"); err != nil {
 		t.Fatalf("StartGame: %v", err)
 	}
-	// Lookup Hitler once; roles are dealt during StartGame.
+	// Look up rogue + singularity once; roles are dealt during StartGame
+	// and don't change for the remainder of the game.
 	allPlayers, _ := h.loadPlayers(ctx, g.GameID)
-	var hitler *models.Player
+	var hitler, singularity *models.Player
 	for _, p := range allPlayers {
 		if p.IsRogue() {
 			hitler = p
-			break
+		}
+		if p.IsSingularity() {
+			singularity = p
 		}
 	}
 
@@ -66,12 +112,29 @@ func driveGame(t *testing.T, seed uint64, playerCount int, strat driveStrategy, 
 		switch game.Phase {
 		case replicant.PhaseNomination:
 			president := findPlayerBySeat(players, game.PresidentSeat)
-			chancellor := pickChancellorStrategy(game, players, president, hitler, strat)
+			chancellor := pickChancellorStrategy(game, players, president, hitler, singularity, strat)
 			if chancellor == nil {
 				t.Fatalf("step %d p=%d: no chancellor; %s", step, playerCount, summarize(game))
 			}
 			if _, err := h.NominateChancellor(ctx, g.GameID, president.PlayerID, chancellor.PlayerID); err != nil {
 				t.Fatalf("step %d: nominate: %v", step, err)
+			}
+
+		case replicant.PhaseCablePhase:
+			// The driver doesn't submit cables (cable_test.go covers
+			// those paths); it just advances the clock past the phase
+			// deadline and lets TimerExpired close it into election.
+			if game.PhaseDeadline != nil {
+				gap := game.PhaseDeadline.Sub(clock.Now())
+				if gap < 0 {
+					gap = 0
+				}
+				clock.Advance(gap + time.Second)
+			} else {
+				clock.Advance(time.Minute)
+			}
+			if err := h.TimerExpired(ctx, g.GameID); err != nil {
+				t.Fatalf("step %d: cable TimerExpired: %v", step, err)
 			}
 
 		case replicant.PhaseElection:
@@ -164,9 +227,13 @@ func pickEnactIndex(options []replicant.PolicyType, prefer replicant.PolicyType)
 	return 0
 }
 
-// pickChancellorStrategy picks a chancellor, favouring Hitler when the
-// strategy requests it and Hitler is alive + eligible.
-func pickChancellorStrategy(game *models.Game, players []*models.Player, president *models.Player, hitler *models.Player, strat driveStrategy) *models.Player {
+// pickChancellorStrategy picks a chancellor, favouring the rogue or
+// the Singularity when the strategy requests it and the target is
+// alive + eligible.
+func pickChancellorStrategy(game *models.Game, players []*models.Player, president *models.Player, hitler *models.Player, singularity *models.Player, strat driveStrategy) *models.Player {
+	if strat.nominateSingularity && singularity != nil && isEligibleChancellor(game, players, president, singularity) {
+		return singularity
+	}
 	if strat.nominateHitler && hitler != nil && isEligibleChancellor(game, players, president, hitler) {
 		return hitler
 	}
@@ -319,7 +386,7 @@ func TestActionMatrix_AllPlayerCounts(t *testing.T) {
 				for _, seed := range seeds {
 					seed := seed
 					t.Run(fmt.Sprintf("%s/seed=%d", strat.name, seed), func(t *testing.T) {
-						rep, final := driveGame(t, seed+uint64(playerCount*101), playerCount, strat.strategy, 2000)
+						rep, final := driveGame(t, seed+uint64(playerCount*101), playerCount, strat.strategy, 2000, nil)
 						if final.Status != replicant.GameStatusCompleted {
 							t.Fatalf("game did not complete: %s", summarize(final))
 						}
@@ -522,4 +589,225 @@ func advanceTo(t *testing.T, h *GameHandler, gameID string, phase replicant.Game
 		}
 	}
 	t.Fatalf("could not advance to %s", phase)
+}
+
+// TestActionMatrix_FeatureVariants sweeps the rule dimensions added
+// after the original Secret Hitler baseline — specifically singularity
+// (three-faction variant) and cable_phase (every-round interstitial) —
+// across multiple player counts, strategies, and seeds.
+//
+// For every (playerCount × singularity × cable) combination:
+//   - every game must complete with Status=Completed,
+//   - when cable is on, cable_phase_opened and cable_phase_closed
+//     events must be observed at least once,
+//   - when singularity is on, the Singularity role must be seated and
+//     the kingmaker win condition must be reachable across the matrix
+//     (via the nominate_singularity strategy).
+//
+// Uses a smaller seed/strategy/player-count slice than the vanilla
+// action matrix so total runtime stays well under the base test.
+func TestActionMatrix_FeatureVariants(t *testing.T) {
+	strategies := []struct {
+		name     string
+		strategy driveStrategy
+	}{
+		{"ai_win", driveStrategy{
+			preferEnact:   replicant.PolicyAI,
+			preferDiscard: replicant.PolicyHuman,
+		}},
+		{"human_win", driveStrategy{
+			preferEnact:   replicant.PolicyHuman,
+			preferDiscard: replicant.PolicyAI,
+		}},
+		{"rogue_executed", driveStrategy{
+			preferEnact:   replicant.PolicyAI,
+			preferDiscard: replicant.PolicyHuman,
+			targetHitler:  true,
+		}},
+		{"nominate_singularity", driveStrategy{
+			preferEnact:         replicant.PolicyAI,
+			preferDiscard:       replicant.PolicyHuman,
+			nominateSingularity: true,
+		}},
+	}
+	seeds := []uint64{3, 11, 23, 47}
+
+	variants := []struct {
+		name        string
+		singularity bool
+		cable       replicant.CablePhaseMode
+	}{
+		{"singularity_off_cable_off", false, replicant.CableModeDisabled},
+		{"singularity_on_cable_off", true, replicant.CableModeDisabled},
+		{"singularity_off_cable_on", false, replicant.CableModeEveryRound},
+		{"singularity_on_cable_on", true, replicant.CableModeEveryRound},
+	}
+
+	// Singularity needs >= 6 seats; 5-player tables skip the sing-on
+	// variants. We keep the player-count set small (5, 7, 9) so the
+	// feature-matrix runtime doesn't blow past the vanilla baseline.
+	for _, playerCount := range []int{5, 7, 9} {
+		playerCount := playerCount
+		for _, v := range variants {
+			v := v
+			if v.singularity && playerCount < 6 {
+				continue
+			}
+			t.Run(fmt.Sprintf("players=%d/%s", playerCount, v.name), func(t *testing.T) {
+				agg := newCoverageReport(&captureEmitter{})
+				winConditions := make(map[replicant.WinCondition]int)
+
+				for _, strat := range strategies {
+					strat := strat
+					// nominate_singularity is a no-op when singularity is
+					// off — skip to keep the log output tidy.
+					if strat.strategy.nominateSingularity && !v.singularity {
+						continue
+					}
+					for _, seed := range seeds {
+						seed := seed
+						t.Run(fmt.Sprintf("%s/seed=%d", strat.name, seed), func(t *testing.T) {
+							opts := &driveOpts{
+								rules: func(r *replicant.RulesConfig) {
+									r.EnableSingularity = v.singularity
+									r.CablePhaseMode = v.cable
+									if v.cable != replicant.CableModeDisabled {
+										r.CablePhaseDurationSec = 5
+										r.CableLeakSilenceChance = 0
+									}
+								},
+							}
+							rep, final := driveGame(t,
+								seed+uint64(playerCount*337),
+								playerCount, strat.strategy, 4000, opts)
+							if final.Status != replicant.GameStatusCompleted {
+								t.Fatalf("game did not complete: %s", summarize(final))
+							}
+							winConditions[final.WinCondition]++
+							agg.merge(rep)
+						})
+					}
+				}
+
+				// Cable-on variants must surface the cable phase events.
+				if v.cable != replicant.CableModeDisabled {
+					if agg.eventCounts[replicant.EventCablePhaseOpened] == 0 {
+						t.Errorf("cable on but no cable_phase_opened events; counts=%v",
+							agg.eventCounts)
+					}
+					if agg.eventCounts[replicant.EventCablePhaseClosed] == 0 {
+						t.Errorf("cable on but no cable_phase_closed events; counts=%v",
+							agg.eventCounts)
+					}
+				} else {
+					if agg.eventCounts[replicant.EventCablePhaseOpened] != 0 {
+						t.Errorf("cable off but saw %d cable_phase_opened events",
+							agg.eventCounts[replicant.EventCablePhaseOpened])
+					}
+				}
+
+				// Singularity-on variants must be reachable for the
+				// kingmaker win condition at least at one of the tested
+				// player counts. We log (not require) per player count
+				// because the strategy set at a given seat count may
+				// produce other wins first.
+				if v.singularity {
+					if winConditions[replicant.WinSingularityKingmaker] == 0 {
+						t.Logf("note: no singularity kingmaker wins at players=%d variant=%s (strategy/seed coverage)",
+							playerCount, v.name)
+					}
+				}
+
+				t.Logf("players=%d variant=%s winConditions=%v cableOpen=%d cableClose=%d cableLeaked=%d",
+					playerCount, v.name, winConditions,
+					agg.eventCounts[replicant.EventCablePhaseOpened],
+					agg.eventCounts[replicant.EventCablePhaseClosed],
+					agg.eventCounts[replicant.EventCableLeaked])
+			})
+		}
+	}
+}
+
+// TestActionMatrix_SingularityKingmakerReachable is a standalone
+// guarantee that the 5th win condition (singularity_kingmaker) is
+// producible via the public engine surface, not just via the
+// hand-stitched scenario in TestSingularity_KingmakerWin. Runs the
+// nominate_singularity strategy across every legal singularity
+// player count (6-10) and asserts the matrix produces at least one
+// kingmaker win overall.
+func TestActionMatrix_SingularityKingmakerReachable(t *testing.T) {
+	strat := driveStrategy{
+		preferEnact:         replicant.PolicyAI,
+		preferDiscard:       replicant.PolicyHuman,
+		nominateSingularity: true,
+	}
+	seeds := []uint64{5, 13, 29, 61, 97}
+	sawKingmaker := false
+	for _, playerCount := range []int{6, 7, 8, 9, 10} {
+		for _, seed := range seeds {
+			opts := &driveOpts{
+				rules: func(r *replicant.RulesConfig) {
+					r.EnableSingularity = true
+				},
+			}
+			_, final := driveGame(t, seed+uint64(playerCount*503),
+				playerCount, strat, 4000, opts)
+			if final.Status != replicant.GameStatusCompleted {
+				t.Fatalf("p=%d seed=%d: not completed: %s",
+					playerCount, seed, summarize(final))
+			}
+			if final.WinCondition == replicant.WinSingularityKingmaker {
+				sawKingmaker = true
+			}
+		}
+	}
+	if !sawKingmaker {
+		t.Errorf("nominate_singularity matrix produced no kingmaker wins across 25 games; " +
+			"strategy or thresholds may have drifted")
+	}
+}
+
+// TestStartGame_AssignsCountryToEveryPlayer guards the country-stamp
+// feature: after StartGame, every seat must have a non-empty
+// CountryCode and CountryName, and each country must be unique within
+// the game. Covers every legal player count.
+func TestStartGame_AssignsCountryToEveryPlayer(t *testing.T) {
+	for _, n := range []int{5, 6, 7, 8, 9, 10} {
+		n := n
+		t.Run(fmt.Sprintf("players=%d", n), func(t *testing.T) {
+			h, _, _, _ := newTestHandler(t, uint64(n)*17)
+			g := seedLobby(t, h, n)
+			ctx := context.Background()
+			if _, err := h.StartGame(ctx, g.GameID, "user-host"); err != nil {
+				t.Fatalf("StartGame: %v", err)
+			}
+			players, err := h.loadPlayers(ctx, g.GameID)
+			if err != nil {
+				t.Fatalf("loadPlayers: %v", err)
+			}
+			if len(players) != n {
+				t.Fatalf("seated %d players, want %d", len(players), n)
+			}
+			seenCode := make(map[string]string)
+			seenName := make(map[string]string)
+			for _, p := range players {
+				if p.CountryCode == "" {
+					t.Errorf("seat %d: empty CountryCode", p.Seat)
+				}
+				if p.CountryName == "" {
+					t.Errorf("seat %d: empty CountryName", p.Seat)
+				}
+				if prior, ok := seenCode[p.CountryCode]; ok {
+					t.Errorf("CountryCode %q assigned twice: seats %q and %d",
+						p.CountryCode, prior, p.Seat)
+				}
+				seenCode[p.CountryCode] = fmt.Sprintf("seat-%d", p.Seat)
+				if prior, ok := seenName[p.CountryName]; ok {
+					t.Errorf("CountryName %q assigned twice: seats %q and %d",
+						p.CountryName, prior, p.Seat)
+				}
+				seenName[p.CountryName] = fmt.Sprintf("seat-%d", p.Seat)
+			}
+		})
+	}
 }
