@@ -71,7 +71,6 @@ export default function HostGamePage() {
   // narrator_speak arrives while one is already playing, it replaces
   // the current one so the host doesn't get behind.
   const [narratorCue, setNarratorCue] = useState<NarratorSpeakPayload | null>(null);
-  const [narratorBusy, setNarratorBusy] = useState(false);
 
   // Cable leak overlay — the Committee's flagged-cable reveal. Shown
   // as a stacked card alongside the narrator. Cleared on the next
@@ -114,8 +113,13 @@ export default function HostGamePage() {
           // opening cue here instead — fire-and-forget, silent on err.
           firedCuesRef.current.add("opening");
           try {
+            const rosterIx: Record<string, Player> = {};
+            for (const pl of snap.players) rosterIx[pl.playerId] = pl;
             await api.narrate(snap.game.gameId, "opening", {
-              vars: { playerCount: String(snap.players.length) },
+              vars: {
+                playerCount: String(snap.players.length),
+                roster: rosterForCue(rosterIx),
+              },
             });
           } catch {
             /* narrator disabled or errored — ignore */
@@ -174,6 +178,24 @@ export default function HostGamePage() {
     })();
   };
 
+  // Fire the post-policy cue ("the Committee reflects on the round").
+  // Passes the leaked cable (if any from this round) so the narrator
+  // can either read it aloud or talk around it. Also passes policy
+  // result + tallies + roster so the model can be hyper-personalised.
+  const firePostPolicyCue = (eventId: string, policy: "human" | "ai" | null, topDeck: boolean) => {
+    const leakBody = cableLeak && !cableLeak.silenced ? cableLeak.body ?? "" : "";
+    fireCue(`post_policy:${eventId}`, "post_policy", {
+      policy: policy ?? "",
+      topDeck: topDeck ? "true" : "false",
+      humanCount: String(game?.humanPoliciesEnacted ?? 0),
+      aiCount: String(game?.aiPoliciesEnacted ?? 0),
+      roster: rosterForCue(players),
+      leakedCable: leakBody,
+      president: titleCase(presName),
+      envoy: titleCase(chanName),
+    });
+  };
+
   // Reconcile only after an SSE error-then-reconnect — the initial
   // open is handled by the boot useEffect and shouldn't race with
   // concurrently-arriving envelopes.
@@ -201,6 +223,7 @@ export default function HostGamePage() {
         if (p) {
           fireCue("opening", "opening", {
             playerCount: String(p.playerCount),
+            roster: rosterForCue(players),
           });
         }
       }
@@ -270,7 +293,9 @@ export default function HostGamePage() {
       }
 
       if (type === "chancellor_enacted") {
-        const p = env.payload as { humanPoliciesEnacted?: number; aiPoliciesEnacted?: number } | undefined;
+        const p = env.payload as
+          | { humanPoliciesEnacted?: number; aiPoliciesEnacted?: number; policy?: "human" | "ai" }
+          | undefined;
         if (!p) return;
         setGame((prev) =>
           prev
@@ -284,10 +309,15 @@ export default function HostGamePage() {
               }
             : prev,
         );
+        // Post-policy narration: the Committee reflects on what just
+        // happened, optionally reading the leaked cable from this round.
+        firePostPolicyCue(env.event.eventId, p.policy ?? null, false);
       }
 
       if (type === "top_deck_enacted") {
-        const p = env.payload as { humanPoliciesEnacted?: number; aiPoliciesEnacted?: number } | undefined;
+        const p = env.payload as
+          | { humanPoliciesEnacted?: number; aiPoliciesEnacted?: number; policy?: "human" | "ai" }
+          | undefined;
         if (!p) return;
         setGame((prev) =>
           prev
@@ -300,6 +330,9 @@ export default function HostGamePage() {
               }
             : prev,
         );
+        // Top-deck still deserves a post-policy reflection — same cue,
+        // flagged so the narrator can note the automatic enactment.
+        firePostPolicyCue(env.event.eventId, p.policy ?? null, true);
       }
 
       if (type === "election_tracker_advanced") {
@@ -338,6 +371,7 @@ export default function HostGamePage() {
           country: victim?.countryName ?? "the unidentified delegation",
           name: victim?.displayName ?? "the delegate",
           trueIdentity: p.wasRogue ? "the Prime Replicant" : "not the Prime Replicant",
+          roster: rosterForCue(players),
         });
       }
 
@@ -350,6 +384,7 @@ export default function HostGamePage() {
           fireCue("closing", "closing", {
             winner: winnerLabel(p.winner),
             condition: humanCondition(p.winCondition),
+            roster: rosterForCue(players),
           });
         }
         // Roster refetch: the backend stops scrubbing roles once the
@@ -456,12 +491,11 @@ export default function HostGamePage() {
             votedCount={Object.keys(votedSet).length}
             aliveCount={seated.filter((p) => p.isAlive).length}
             lastElection={lastElection}
+            cableLeak={cableLeak}
           />
         )}
 
         {execution && <TerminatedOverlay ex={execution} />}
-
-        {cableLeak && <CableLeakOverlay payload={cableLeak} />}
 
         {narratorCue && (
           <HostNarrator
@@ -469,61 +503,9 @@ export default function HostGamePage() {
             onComplete={() => setNarratorCue(null)}
           />
         )}
-
-        {/* Host-only SPEAK control. Hidden while narrator is busy or
-            the game is over. */}
-        {token && game && game.status !== "completed" && !narratorCue && (
-          <button
-            disabled={narratorBusy}
-            onClick={async () => {
-              if (!game) return;
-              setNarratorBusy(true);
-              try {
-                const api = new HostApi({ token });
-                await api.narrate(game.gameId, pickAutoCue(game));
-              } catch (e) {
-                setErr(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
-              } finally {
-                setNarratorBusy(false);
-              }
-            }}
-            style={{
-              position: "absolute",
-              right: 18,
-              bottom: 56,
-              zIndex: 30,
-              background: rpColors.cyan,
-              color: rpColors.broadcast,
-              border: `2px solid ${rpColors.cyan}`,
-              padding: "10px 16px",
-              fontFamily: "var(--font-display)",
-              fontSize: 13,
-              fontWeight: 700,
-              letterSpacing: "0.14em",
-              boxShadow: "3px 3px 0 rgba(0,0,0,0.5)",
-              cursor: narratorBusy ? "wait" : "pointer",
-              opacity: narratorBusy ? 0.5 : 1,
-            }}
-          >
-            {narratorBusy ? "◼ SYNTHESIZING…" : "▸ SPEAK"}
-          </button>
-        )}
       </RPTVChrome>
     </div>
   );
-}
-
-/** Pick a sensible cue based on current phase — used by the SPEAK
- *  button when no event-specific cue has been requested. */
-function pickAutoCue(g: Game): string {
-  switch (g.phase) {
-    case "nomination":
-      return "opening";
-    case "game_over":
-      return "closing";
-    default:
-      return "opening";
-  }
 }
 
 // ─── In-game dispatcher ───────────────────────────────────────────
@@ -538,6 +520,7 @@ function InGameBoard({
   votedCount,
   aliveCount,
   lastElection,
+  cableLeak,
 }: {
   game: Game | null;
   seated: Player[];
@@ -548,37 +531,50 @@ function InGameBoard({
   votedCount: number;
   aliveCount: number;
   lastElection: LastElection | null;
+  cableLeak: CableLeakedPayload | null;
 }) {
   return (
     <div
       style={{
         height: "100%",
-        padding: "40px 72px",
-        display: "grid",
-        gridTemplateColumns: "1.2fr 1fr",
-        gap: 56,
+        padding: "24px 72px 32px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        minHeight: 0,
       }}
     >
-      {/* LEFT — phase-specific stage */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 32, minHeight: 0 }}>
-        <PhaseStage
-          game={game}
-          presName={presName}
-          chanName={chanName}
-          votedCount={votedCount}
-          aliveCount={aliveCount}
-          lastElection={lastElection}
-        />
-      </div>
+      {cableLeak && <CableLeakBanner payload={cableLeak} />}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.2fr 1fr",
+          gap: 56,
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
+        {/* LEFT — phase-specific stage */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 32, minHeight: 0 }}>
+          <PhaseStage
+            game={game}
+            presName={presName}
+            chanName={chanName}
+            votedCount={votedCount}
+            aliveCount={aliveCount}
+            lastElection={lastElection}
+          />
+        </div>
 
-      {/* RIGHT — policy track + assembly */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 24, minHeight: 0 }}>
-        <PolicyTrack game={game} />
-        <Assembly
-          seated={seated}
-          presidentPlayerId={presidentPlayerId}
-          chancellorPlayerId={chancellorPlayerId}
-        />
+        {/* RIGHT — policy track + assembly */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 24, minHeight: 0 }}>
+          <PolicyTrack game={game} />
+          <Assembly
+            seated={seated}
+            presidentPlayerId={presidentPlayerId}
+            chancellorPlayerId={chancellorPlayerId}
+          />
+        </div>
       </div>
     </div>
   );
@@ -1605,113 +1601,100 @@ function humanCondition(c: WinCondition): string {
 
 // ─── TERMINATED overlay ───────────────────────────────────────────
 
-// ─── Cable leak overlay ───────────────────────────────────────────
+// ─── Cable leak banner ───────────────────────────────────────────
 //
-// Rendered when a cable_leaked envelope arrives. Silenced leaks show
-// a muted "NO TRAFFIC FLAGGED" card; flagged leaks render the author
-// + quoted body with a big red CLASSIFIED/INTERCEPTED stamp. The
-// overlay stays on screen through the election vote so players can
-// reference it — clears on the next cable_phase_opened.
-
-function CableLeakOverlay({ payload }: { payload: CableLeakedPayload }) {
+// Inline strip rendered at the top of InGameBoard when a cable was
+// leaked this round. Sits IN the layout (not on top of it) so it
+// doesn't cover current phase info. Silenced leaks show a muted
+// "no traffic" row; flagged leaks show author + quoted body with a
+// subversion-score pill on the right. Auto-clears on the next
+// cable_phase_opened envelope.
+function CableLeakBanner({ payload }: { payload: CableLeakedPayload }) {
   if (payload.silenced) {
     return (
       <div
         style={{
-          position: "absolute",
-          left: 40,
-          top: 40,
-          zIndex: 22,
-          maxWidth: 520,
-          padding: "14px 18px",
+          padding: "10px 18px",
           border: `1px solid ${rpColors.broadcastRule}`,
-          background: "rgba(20, 22, 26, 0.88)",
-          animation: "paperSlide 0.3s ease-out both",
+          background: "rgba(255,255,255,0.02)",
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          color: rpColors.inkFaded,
+          letterSpacing: 1.2,
+          animation: "paperSlide 0.28s ease-out both",
         }}
       >
-        <div
-          className="t-eyebrow"
-          style={{ color: rpColors.inkFaded, marginBottom: 6, fontSize: 11 }}
-        >
-          ◼ CABLE REVIEW · NO TRAFFIC FLAGGED
-        </div>
-        <div
-          style={{
-            fontFamily: "var(--font-typewriter)",
-            fontSize: 14,
-            color: rpColors.paper3,
-            opacity: 0.75,
-            lineHeight: 1.4,
-          }}
-        >
-          &quot;The Committee reviewed this round&apos;s diplomatic traffic.
-          No items warrant broadcast.&quot;
-        </div>
+        <span className="t-eyebrow" style={{ color: rpColors.inkFaded, fontSize: 10 }}>
+          ◼ CABLE REVIEW
+        </span>
+        <span style={{ fontFamily: "var(--font-typewriter)", fontSize: 13, color: rpColors.paper3, opacity: 0.75 }}>
+          &quot;No traffic worth broadcasting this round.&quot;
+        </span>
       </div>
     );
   }
   return (
     <div
       style={{
-        position: "absolute",
-        left: 40,
-        top: 40,
-        zIndex: 22,
-        maxWidth: 640,
-        padding: "20px 24px",
+        padding: "12px 20px",
         border: `2px solid ${rpColors.stampRed}`,
-        background: "rgba(20, 22, 26, 0.92)",
-        boxShadow: "4px 4px 0 rgba(0,0,0,0.6)",
-        animation: "paperSlide 0.3s ease-out both",
+        background: "rgba(179,39,36,0.08)",
+        display: "flex",
+        alignItems: "center",
+        gap: 20,
+        animation: "paperSlide 0.28s ease-out both",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 10,
-        }}
-      >
-        <div className="t-eyebrow" style={{ color: rpColors.stampRed, fontSize: 12 }}>
-          ◼ INTERCEPTED CABLE · COMMITTEE FLAGGED
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+        <div className="t-eyebrow" style={{ color: rpColors.stampRed, fontSize: 10 }}>
+          ◼ INTERCEPTED CABLE
         </div>
         <div
           style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 10,
-            color: rpColors.inkFaded,
-            letterSpacing: 1.3,
+            fontFamily: "var(--font-display)",
+            fontWeight: 700,
+            fontSize: 18,
+            color: rpColors.paper3,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
           }}
         >
-          SUBVERSION · {String(Math.round(payload.subversionScore ?? 0)).padStart(2, "0")}/10
+          {payload.author ? titleCase(payload.author).toUpperCase() : "UNATTRIBUTED"}
         </div>
       </div>
       <div
         style={{
-          fontFamily: "var(--font-display)",
-          fontWeight: 700,
-          fontSize: 32,
-          color: rpColors.paper3,
-          letterSpacing: "0.02em",
-          textTransform: "uppercase",
-          marginBottom: 8,
-        }}
-      >
-        {payload.author ? titleCase(payload.author).toUpperCase() : "UNATTRIBUTED"}
-      </div>
-      <div
-        style={{
+          flex: 1,
           fontFamily: "var(--font-typewriter)",
-          fontSize: 18,
+          fontSize: 16,
           color: rpColors.paper3,
-          lineHeight: 1.45,
+          lineHeight: 1.4,
           borderLeft: `3px solid ${rpColors.stampRed}`,
           paddingLeft: 14,
-          maxWidth: 560,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
       >
         &ldquo;{payload.body}&rdquo;
+      </div>
+      <div
+        style={{
+          flexShrink: 0,
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          color: rpColors.inkFaded,
+          letterSpacing: 1.3,
+          textAlign: "right",
+        }}
+      >
+        SUBVERSION
+        <br />
+        <span style={{ color: rpColors.stampRed, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700 }}>
+          {String(Math.round(payload.subversionScore ?? 0)).padStart(2, "0")}/10
+        </span>
       </div>
     </div>
   );
@@ -1827,6 +1810,23 @@ function execPhaseTitle(a: Game["pendingActionType"]): string {
     default:
       return "EXECUTIVE\nORDER";
   }
+}
+
+/** Serialise the current roster into a single line the narrator can
+ *  chew on — seat + country + display name, alive state, separated by
+ *  pipes. Keeps the LLM prompt short while still enough to mock a
+ *  funny name or call out the Brazil delegate. */
+function rosterForCue(players: Record<string, Player>): string {
+  const rows = Object.values(players)
+    .sort((a, b) => a.seat - b.seat)
+    .map((p) => {
+      const parts: string[] = [`seat ${p.seat + 1}`];
+      if (p.countryName) parts.push(p.countryName);
+      parts.push(p.displayName);
+      if (!p.isAlive) parts.push("[struck]");
+      return parts.join(", ");
+    });
+  return rows.join(" | ");
 }
 
 function titleCase(s: string): string {

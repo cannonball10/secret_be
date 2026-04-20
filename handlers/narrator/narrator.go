@@ -42,12 +42,25 @@ const (
 	CueExecution        CueKind = "execution"
 	CueClosing          CueKind = "closing"
 	// CueCableLeak announces a leaked Cable Phase cable. Vars:
-	//   · "author"  — speaker's display name
+	//   · "author"  — speaker's display name (empty = unattributed)
 	//   · "body"    — the verbatim cable text
 	CueCableLeak CueKind = "cable_leak"
 	// CueCableSilence is what the Committee says when no cable from
 	// the round meets the subversion bar. Takes no vars.
 	CueCableSilence CueKind = "cable_silence"
+	// CuePostPolicy fires after every successful policy enactment —
+	// the Committee's reflection on the round. Either reads the
+	// latest leaked cable aloud, or seeds conversation without
+	// revealing anyone. Vars:
+	//   · "policy"      — "human" | "ai" (what just landed)
+	//   · "topDeck"     — "true" if automatic top-deck enactment
+	//   · "humanCount"  — running human count
+	//   · "aiCount"     — running AI count
+	//   · "president"   — display name of the seated President
+	//   · "envoy"       — display name of the Envoy (empty for top-deck)
+	//   · "leakedCable" — body of the cable leaked this round (or "")
+	//   · "roster"      — seat/country/name list
+	CuePostPolicy CueKind = "post_policy"
 	// CueCustom lets a host type raw text; we skip the LLM and feed
 	// the text straight to TTS so the demo can showcase the pipeline
 	// without burning an inference call.
