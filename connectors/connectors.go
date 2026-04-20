@@ -19,7 +19,9 @@ import (
 	"github.com/cannonball10/foundation/connectors/ratelimit"
 	"github.com/cannonball10/foundation/connectors/secret"
 	"github.com/cannonball10/foundation/connectors/storage"
+	"github.com/cannonball10/foundation/connectors/stt"
 	"github.com/cannonball10/foundation/connectors/timeseries"
+	"github.com/cannonball10/foundation/connectors/tts"
 	"github.com/cannonball10/foundation/connectors/vector"
 )
 
@@ -38,7 +40,9 @@ type Connectors struct {
 	RateLimiter    ratelimit.RateLimiterConnector
 	Secret         secret.SecretConnector
 	Storage        storage.StorageConnector
+	STT            stt.STTConnector
 	Timeseries     timeseries.TimeseriesConnector
+	TTS            tts.TTSConnector
 	Vector         vector.VectorConnector
 }
 
@@ -57,7 +61,9 @@ type ConnectorsOptions struct {
 	RateLimiter    ratelimit.RateLimiterConnector
 	Secret         secret.SecretConnector
 	Storage        storage.StorageConnector
+	STT            stt.STTConnector
 	Timeseries     timeseries.TimeseriesConnector
+	TTS            tts.TTSConnector
 	Vector         vector.VectorConnector
 }
 
@@ -77,7 +83,9 @@ func NewConnectors(opts ConnectorsOptions) *Connectors {
 		RateLimiter:    opts.RateLimiter,
 		Secret:         opts.Secret,
 		Storage:        opts.Storage,
+		STT:            opts.STT,
 		Timeseries:     opts.Timeseries,
+		TTS:            opts.TTS,
 		Vector:         opts.Vector,
 	}
 
@@ -146,6 +154,14 @@ func DefaultConnectors(ctx context.Context) (*Connectors, error) {
 	if err != nil {
 		return nil, err
 	}
+	ttsConn, err := tts.DefaultTTSConnector(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sttConn, err := stt.DefaultSTTConnector(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return NewConnectors(ConnectorsOptions{
 		Authentication: authentication,
 		Cache:          cache,
@@ -161,7 +177,9 @@ func DefaultConnectors(ctx context.Context) (*Connectors, error) {
 		RateLimiter:    rateLimiter,
 		Secret:         secret,
 		Storage:        storage,
+		STT:            sttConn,
 		Timeseries:     ts,
+		TTS:            ttsConn,
 		Vector:         vector,
 	}), nil
 }
@@ -182,7 +200,9 @@ func (d *Connectors) values() []any {
 		d.RateLimiter,
 		d.Secret,
 		d.Storage,
+		d.STT,
 		d.Timeseries,
+		d.TTS,
 		d.Vector,
 	}
 }
