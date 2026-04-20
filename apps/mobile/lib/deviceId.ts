@@ -18,6 +18,19 @@ export function deviceId(): string {
   }
 }
 
+/** Force a brand-new deviceId. Used by /join?asNew=1 so a single
+ *  browser profile can seat as multiple players during local QA. */
+export function resetDeviceId(): string {
+  const next = `player-${randomId()}`;
+  if (typeof window === "undefined") return next;
+  try {
+    window.localStorage.setItem(KEY, next);
+  } catch {
+    // ignore
+  }
+  return next;
+}
+
 function randomId(): string {
   const bytes = new Uint8Array(8);
   (globalThis.crypto ?? window.crypto).getRandomValues(bytes);

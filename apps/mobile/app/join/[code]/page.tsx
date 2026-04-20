@@ -5,26 +5,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { RPButton, RPSeal } from "@replicant/ui";
 import { MobileApi, ApiError } from "@/lib/api";
-import { deviceId } from "@/lib/deviceId";
+import { deviceId, resetDeviceId } from "@/lib/deviceId";
 import { clearSession, loadSession, saveSession } from "@/lib/session";
 
 export default function MobileJoinPage() {
   const router = useRouter();
   const params = useParams<{ code: string }>();
+  const search = useSearchParams();
   const code = (params?.code ?? "").toUpperCase();
 
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
-  // If we're already in this game, skip the join form.
+  // ?asNew=1 forces a fresh device identity + clears any prior session.
+  // Lets one browser profile seat multiple players during local QA
+  // without hunting for a second incognito window every time. Strip the
+  // flag from the URL once it's applied so a refresh doesn't keep
+  // re-rolling and churning player rows.
   useEffect(() => {
+    if (search?.get("asNew") === "1") {
+      clearSession();
+      resetDeviceId();
+      router.replace(`/join/${code}`);
+      return;
+    }
     const s = loadSession();
-    if (s && s.joinCode === code) router.replace("/game");
-  }, [code, router]);
+    if (s && s.joinCode === code) {
+      router.replace("/game");
+      return;
+    }
+    setReady(true);
+  }, [code, router, search]);
 
   const join = async () => {
     if (!name.trim() || busy) return;
@@ -47,6 +63,10 @@ export default function MobileJoinPage() {
       setErr(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
     }
   };
+
+  // Hold the render until the reset/redirect effect settles. Avoids a
+  // one-frame flash of the intake form when asNew=1 is being processed.
+  if (!ready) return null;
 
   return (
     <main style={{ padding: "28px 22px 40px", display: "flex", flexDirection: "column", gap: 20 }}>
