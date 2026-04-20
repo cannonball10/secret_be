@@ -218,11 +218,28 @@ func (h *GameHandler) stepSim(ctx context.Context, game *models.Game, players []
 			return fmt.Errorf("no president at seat %d", game.PresidentSeat)
 		}
 		if !isBotUser(president.UserID) {
-			return nil // human's nomination — wait
+			// A real user is in the chair. The sim can't act on their
+			// behalf — log loudly the first time we hit this seat so
+			// someone debugging "why is it stuck?" sees the reason
+			// without having to dig into the player table.
+			slog.Info("sim: awaiting human president",
+				"gameId", shortID(game.GameID), "seat", president.Seat,
+				"userId", president.UserID, "displayName", president.DisplayName,
+				"alive", president.IsAlive)
+			return nil
+		}
+		if !president.IsAlive {
+			// Shouldn't happen — rotatePresident skips dead seats —
+			// but if it does, the sim would loop forever since
+			// NominateChancellor fails the "actor is president" check.
+			// Log + force-progress to recover.
+			slog.Warn("sim: bot president marked dead; forcing progress",
+				"gameId", shortID(game.GameID), "seat", president.Seat)
+			return h.ForceProgress(ctx, game.GameID, game.HostUserID)
 		}
 		chancellor := pickSimChancellor(game, players, president, rng)
 		if chancellor == nil {
-			return fmt.Errorf("no eligible chancellor")
+			return fmt.Errorf("no eligible chancellor (pres seat %d)", president.Seat)
 		}
 		_, err := h.NominateChancellor(ctx, game.GameID, president.PlayerID, chancellor.PlayerID)
 		return err
@@ -450,7 +467,7 @@ func pickSimChancellor(game *models.Game, players []*models.Player, president *m
 		return nil
 	}
 	pick := cand[rng.IntN(len(cand))]
-	slog.Debug("pickSimChancellor",
+	slog.Info("sim: envoy pick",
 		"gameId", shortID(game.GameID), "presSeat", president.Seat,
 		"pickSeat", pick.Seat, "pickAlive", pick.IsAlive,
 		"candidates", len(cand), "dead", dead)
