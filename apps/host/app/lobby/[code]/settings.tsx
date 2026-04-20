@@ -244,6 +244,12 @@ function SettingsModal({
                 disabled={draft.cablePhaseMode === "disabled"}
               />
               <ToggleRow
+                label="Anonymous leaks"
+                hint="When on, the Committee broadcasts a leaked cable without naming its author. Off makes the leak a direct outing."
+                checked={draft.anonymousCableLeaks !== false}
+                onChange={(on) => setDraft({ ...draft, anonymousCableLeaks: on })}
+              />
+              <ToggleRow
                 label="Enable Singularity (3-faction)"
                 hint="6+ players. Adds one kingmaker role — wins alone if they take the Envoy's seat post-codes."
                 checked={!!draft.enableSingularity}

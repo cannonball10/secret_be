@@ -95,13 +95,17 @@ export type EventType = z.infer<typeof EventType>;
 
 /**
  * Chat room scopes.
- * - "ai"     → replicant/rogue cabal whisper channel (always on)
+ * - "ai"     → replicant/rogue cabal whisper channel (deprecated in UI;
+ *              backend still accepts it).
+ * - "dm"     → direct message between two alive delegates. Server
+ *              persists and whispers to both parties; recipientPlayerId
+ *              on the payload identifies the other party.
  * - "cable"  → Cable Phase submissions. Server persists and whispers
  *              an Ack=true back to the sender; other players never
  *              see the content at send time. The phase-end LLM ranker
  *              picks one cable to broadcast via the narrator.
  */
-export const ChatChannel = z.enum(["ai", "cable"]);
+export const ChatChannel = z.enum(["ai", "dm", "cable"]);
 export type ChatChannel = z.infer<typeof ChatChannel>;
 
 export const ProgressReason = z.enum(["action", "timeout", "forced", "all_voted"]);

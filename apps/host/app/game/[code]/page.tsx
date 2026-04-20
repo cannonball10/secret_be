@@ -1628,7 +1628,7 @@ function CableLeakOverlay({ payload }: { payload: CableLeakedPayload }) {
           marginBottom: 8,
         }}
       >
-        {titleCase(payload.author ?? "—").toUpperCase()}
+        {payload.author ? titleCase(payload.author).toUpperCase() : "UNATTRIBUTED"}
       </div>
       <div
         style={{

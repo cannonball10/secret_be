@@ -19,7 +19,18 @@ type ChatChannel string
 const (
 	// ChannelAI is the private whisper channel shared by all AI-faction
 	// roles (replicants + the rogue/prime). Humans never see it.
+	// Deprecated in the UI; kept on the backend as a potential future
+	// faction room. SendChat still accepts it for any client that hits
+	// the channel explicitly.
 	ChannelAI ChatChannel = "ai"
+
+	// ChannelDM is a private direct message between two alive players.
+	// Unlike the cable channel, DMs are open at any time in the game —
+	// an always-on side-channel replacing the removed "kin chat". The
+	// sender provides a recipient PlayerID; the server persists + whispers
+	// to both parties (sender gets an echo so their device can render
+	// the thread symmetrically).
+	ChannelDM ChatChannel = "dm"
 
 	// ChannelCable is a write-only submission channel used during the
 	// Cable Phase. The server persists the message with the current
@@ -44,6 +55,9 @@ type ChatMessagePayload struct {
 	// host UI can show a per-round counter. Empty for channels that
 	// aren't round-scoped (cabal).
 	GovernmentID string `json:"governmentId,omitempty"`
+	// RecipientPlayerID is populated for ChannelDM so both parties can
+	// thread the conversation against the same key.
+	RecipientPlayerID string `json:"recipientPlayerId,omitempty"`
 	// Ack is true when this payload is a write-ack sent back to the
 	// author of a ChannelCable submission. Other receivers never see
 	// Ack=true envelopes.
@@ -148,6 +162,77 @@ func (h *GameHandler) SendChat(ctx context.Context, gameID, senderPlayerID strin
 		ev := models.NewGameEvent(gameID, replicant.EventChatMessage, sender.PlayerID).
 			WithTarget(p.PlayerID)
 		h.whisper(ctx, ev, p.PlayerID, payload)
+	}
+	return nil
+}
+
+// SendDM posts a direct message from sender to recipient. Both must be
+// alive and in the same game. Open at any time during active play —
+// no phase gate — so delegations can negotiate side-deals continuously.
+// The server persists the message, whispers it to the recipient, and
+// echoes it back to the sender so both devices render the same thread.
+func (h *GameHandler) SendDM(ctx context.Context, gameID, senderPlayerID, recipientPlayerID, body string) error {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return fmt.Errorf("%w: empty DM body", ErrInvalidTransition)
+	}
+	if len(body) > 500 {
+		body = body[:500]
+	}
+	if senderPlayerID == recipientPlayerID {
+		return fmt.Errorf("%w: cannot DM yourself", ErrInvalidTransition)
+	}
+
+	game, err := h.loadGame(ctx, gameID)
+	if err != nil {
+		return err
+	}
+	if game.Status == replicant.GameStatusLobby || game.Status == replicant.GameStatusCompleted {
+		return fmt.Errorf("%w: DMs unavailable outside active play", ErrInvalidTransition)
+	}
+
+	players, err := h.loadPlayers(ctx, gameID)
+	if err != nil {
+		return err
+	}
+	sender := findPlayerByID(players, senderPlayerID)
+	if sender == nil {
+		return ErrPlayerNotFound
+	}
+	if !sender.IsAlive {
+		return fmt.Errorf("%w: dead delegates may not send DMs", ErrChannelAccessDenied)
+	}
+	recipient := findPlayerByID(players, recipientPlayerID)
+	if recipient == nil {
+		return ErrPlayerNotFound
+	}
+	if !recipient.IsAlive {
+		return fmt.Errorf("%w: recipient is no longer seated", ErrChannelAccessDenied)
+	}
+
+	now := h.clock.Now().UTC().Format(time.RFC3339)
+	msg := models.NewChatMessage(gameID, string(ChannelDM), sender.PlayerID, sender.DisplayName, body)
+	msg.RecipientPlayerID = recipient.PlayerID
+	msg.SubmittedAt = now
+	if err := h.db.Upsert(ctx, nil, msg); err != nil {
+		return err
+	}
+	payload := ChatMessagePayload{
+		MessageID:         msg.MessageID,
+		Channel:           ChannelDM,
+		AuthorPlayerID:    sender.PlayerID,
+		AuthorDisplayName: sender.DisplayName,
+		Body:              body,
+		SentAt:            now,
+		RecipientPlayerID: recipient.PlayerID,
+	}
+	// Fan out to both parties. The recipient gets the primary delivery;
+	// the sender gets an echo so their compose UI flips the message from
+	// "pending" to "sent" without having to refetch.
+	for _, pid := range []string{recipient.PlayerID, sender.PlayerID} {
+		ev := models.NewGameEvent(gameID, replicant.EventChatMessage, sender.PlayerID).
+			WithTarget(pid)
+		h.whisper(ctx, ev, pid, payload)
 	}
 	return nil
 }

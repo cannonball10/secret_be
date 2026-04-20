@@ -170,6 +170,7 @@ export const ChatMessagePayload = z.object({
   body: z.string(),
   sentAt: z.string(),
   governmentId: z.string().optional(),
+  recipientPlayerId: z.string().optional(),
   ack: z.boolean().optional(),
 });
 export type ChatMessagePayload = z.infer<typeof ChatMessagePayload>;

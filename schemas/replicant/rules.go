@@ -73,6 +73,13 @@ type RulesConfig struct {
 	// silence means safety or just luck. 0 = always leak; 1 = always
 	// silent.
 	CableLeakSilenceChance float64 `json:"cableLeakSilenceChance"`
+
+	// AnonymousCableLeaks, when true (default), strips the author from
+	// the cable_leaked broadcast so the Committee's transmission lands
+	// without attribution — the table has to guess who wrote it. When
+	// false, the author is named explicitly, making leaks a direct
+	// outing mechanism rather than a guessing game.
+	AnonymousCableLeaks bool `json:"anonymousCableLeaks"`
 }
 
 // PackageMinPlayers and PackageMaxPlayers are absolute bounds that
@@ -101,6 +108,7 @@ func DefaultRules() RulesConfig {
 		CablePhaseMode:         CableModeDisabled,
 		CablePhaseDurationSec:  45,
 		CableLeakSilenceChance: 0.15,
+		AnonymousCableLeaks:    true,
 	}
 }
 

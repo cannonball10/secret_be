@@ -56,6 +56,11 @@ type chatReq struct {
 	Body    string `json:"body" binding:"required"`
 }
 
+type dmReq struct {
+	RecipientPlayerID string `json:"recipientPlayerId" binding:"required"`
+	Body              string `json:"body" binding:"required"`
+}
+
 // updateRulesReq carries a full RulesConfig the host wants stamped
 // onto a lobby. Clients build this by fetching the current game,
 // mutating one field on its `rules`, and POSTing the whole struct
@@ -305,6 +310,24 @@ func (s *Server) handleResolveVeto(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusAccepted, gin.H{"status": "veto resolved"})
+}
+
+func (s *Server) handleDMSend(c *gin.Context) {
+	var body dmReq
+	if err := c.ShouldBindJSON(&body); err != nil {
+		badRequest(c, err)
+		return
+	}
+	gameID := c.Param("gameId")
+	player, err := s.currentPlayer(c, gameID)
+	if err != nil {
+		return
+	}
+	if err := s.engine.SendDM(c.Request.Context(), gameID, player.PlayerID, body.RecipientPlayerID, body.Body); err != nil {
+		writeEngineError(c, err)
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"status": "sent"})
 }
 
 func (s *Server) handleChatSend(c *gin.Context) {

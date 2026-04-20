@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   RPButton,
-  RPMobileStatusBar,
   RPPlayerChip,
   RPRedact,
   RPSeal,
@@ -54,7 +53,7 @@ import {
   Terminated,
   WaitFor,
 } from "./panels";
-import { ChatDrawer } from "./chat";
+import { DMDrawer } from "./dms";
 
 type LoadState = "boot" | "ready" | "error";
 
@@ -89,8 +88,14 @@ export default function MobileGamePage() {
   const [finalWinner, setFinalWinner] = useState<Party | null>(null);
   const [finalCondition, setFinalCondition] = useState<WinCondition | null>(null);
 
-  const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessagePayload[]>([]);
+
+  // Open DMs — conversations with any other delegate. Keyed on the
+  // peer's playerId so both directions of a thread (authored by me or
+  // sent to me) collapse into a single feed with the same peer.
+  const [dmOpen, setDmOpen] = useState(false);
+  const [dmThreads, setDmThreads] = useState<Record<string, ChatMessagePayload[]>>({});
+  const [dmUnread, setDmUnread] = useState<Set<string>>(() => new Set());
 
   // Per-phase cable submission buffer. Keyed on governmentId so the
   // "queued" counter resets automatically at the next cable phase.
@@ -341,6 +346,30 @@ export default function MobileGamePage() {
           });
           return;
         }
+        if (p.channel === "dm") {
+          // Peer key: the OTHER party to the conversation. Author for
+          // incoming messages, recipient for my own echoes.
+          const peerId =
+            p.authorPlayerId === myPlayerId ? p.recipientPlayerId ?? "" : p.authorPlayerId;
+          if (!peerId) return;
+          setDmThreads((prev) => {
+            const thread = prev[peerId] ?? [];
+            if (thread.some((m) => m.messageId === p.messageId)) return prev;
+            return { ...prev, [peerId]: [...thread, p].slice(-200) };
+          });
+          // Only mark unread for incoming messages when the drawer
+          // isn't focused on that peer right now. The drawer's
+          // onOpenThread callback clears the flag.
+          if (p.authorPlayerId !== myPlayerId) {
+            setDmUnread((prev) => {
+              if (prev.has(peerId)) return prev;
+              const next = new Set(prev);
+              next.add(peerId);
+              return next;
+            });
+          }
+          return;
+        }
       }
 
       if (type === "game_ended") {
@@ -357,7 +386,6 @@ export default function MobileGamePage() {
   const iAmPresident = !!(me && presidentPlayerId && me.playerId === presidentPlayerId);
   const iAmChancellor = !!(me && chancellorPlayerId && me.playerId === chancellorPlayerId);
   const iHaveVoted = me ? !!votedSet[me.playerId] : false;
-  const amOnAICabal = role === "ai" || role === "rogue";
 
   const api = useMemo(() => (token ? new MobileApi({ token }) : null), [token]);
   const guard = useCallback(async (fn: () => Promise<unknown>) => {
@@ -404,34 +432,45 @@ export default function MobileGamePage() {
     );
   }
 
+  // Year display: matches host chrome — 5yr from now + current round.
   const statusLine = !game
     ? "…"
     : game.status === "lobby"
     ? "INTAKE"
     : game.status === "completed"
-    ? "CLOSED"
-    : `DAY ${String(game.round).padStart(2, "0")}`;
+    ? "FINAL"
+    : `YEAR ${new Date().getUTCFullYear() + 5 + game.round - 1}`;
 
+  // Header line: delegate identity (country + display name + seat) on
+  // the left, phase on the right. No fake-iOS status-bar chrome — it
+  // was flavour-only and confused players who thought the 21:47 /
+  // battery meter were live values.
+  const headerLabel = me?.countryName
+    ? `${me.countryName.toUpperCase()} · ${me.displayName}`
+    : me?.displayName ?? "—";
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-      <RPMobileStatusBar />
       <div
         style={{
-          padding: "4px 20px 12px",
+          padding: "14px 20px 10px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          borderBottom: `1px dashed ${rpColors.paperLine}`,
+          borderBottom: `1px solid ${rpColors.paperLine}`,
           fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          color: rpColors.inkFaded,
-          letterSpacing: 1.5,
+          fontSize: 11,
+          color: rpColors.ink,
+          letterSpacing: 1.2,
+          background: rpColors.paper2,
         }}
       >
         <span>
-          ■ DELEGATE #{me ? String(me.seat + 1).padStart(2, "0") : "??"} · {me?.displayName ?? "?"}
+          <span style={{ color: rpColors.stampBlue, fontWeight: 700 }}>
+            {me ? `#${String(me.seat + 1).padStart(2, "0")}` : "#??"}
+          </span>{" "}
+          · {headerLabel}
         </span>
-        <span>R-07 · {statusLine}</span>
+        <span style={{ color: rpColors.inkFaded }}>{statusLine}</span>
       </div>
 
       {err && (
@@ -481,16 +520,16 @@ export default function MobileGamePage() {
         api={api}
       />
 
-      {amOnAICabal && game?.status === "in_progress" && (
+      {me?.isAlive && game?.status === "in_progress" && (
         <button
-          onClick={() => setChatOpen(true)}
+          onClick={() => setDmOpen(true)}
           style={{
             position: "fixed",
             right: 16,
             bottom: 56,
-            background: rpColors.stampRed,
+            background: rpColors.stampBlue,
             color: rpColors.paper3,
-            border: `2px solid ${rpColors.stampRed2}`,
+            border: `2px solid ${rpColors.stampBlue}`,
             padding: "10px 14px",
             fontFamily: "var(--font-display)",
             fontSize: 13,
@@ -501,34 +540,44 @@ export default function MobileGamePage() {
             zIndex: 20,
           }}
         >
-          ◼ KIN CHANNEL
-          {chatMessages.length > 0 && (
+          ◼ DIRECT CHANNELS
+          {dmUnread.size > 0 && (
             <span
               style={{
                 marginLeft: 8,
-                background: rpColors.paper3,
-                color: rpColors.stampRed,
+                background: rpColors.stampRed,
+                color: rpColors.paper3,
                 padding: "1px 6px",
                 fontSize: 11,
               }}
             >
-              {chatMessages.length}
+              {dmUnread.size}
             </span>
           )}
         </button>
       )}
 
-      {chatOpen && amOnAICabal && (
-        <ChatDrawer
-          messages={chatMessages}
-          meId={me?.playerId ?? ""}
-          onClose={() => setChatOpen(false)}
-          onSend={(body) =>
+      {dmOpen && me && (
+        <DMDrawer
+          meId={me.playerId}
+          players={players}
+          threads={dmThreads}
+          unread={dmUnread}
+          onOpenThread={(peerId) => {
+            setDmUnread((prev) => {
+              if (!prev.has(peerId)) return prev;
+              const next = new Set(prev);
+              next.delete(peerId);
+              return next;
+            });
+          }}
+          onSend={(peerId, body) =>
             guard(async () => {
               if (!api || !gameId) return;
-              await api.sendChat(gameId, "ai", body);
+              await api.sendDM(gameId, peerId, body);
             })
           }
+          onClose={() => setDmOpen(false)}
         />
       )}
 

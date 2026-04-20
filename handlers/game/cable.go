@@ -140,18 +140,33 @@ func (h *GameHandler) runCableLeak(ctx context.Context, game *models.Game) cable
 	}
 
 	result.leakedMessageID = top.MessageID
-	result.payload = &CableLeakedPayload{
+	// Honour the anonymous-leaks rule: when on, strip author from the
+	// broadcast payload AND from the narrator prompt vars. Host UI
+	// reads an empty Author as "UNATTRIBUTED" and renders accordingly.
+	anon := game.Rules.AnonymousCableLeaks
+	payload := &CableLeakedPayload{
 		GovernmentID:    game.CurrentGovernmentID,
 		Silenced:        false,
 		MessageID:       top.MessageID,
-		AuthorPlayerID:  top.AuthorPlayerID,
-		Author:          top.AuthorDisplayName,
 		Body:            top.Body,
 		SubversionScore: topScore,
 	}
+	if !anon {
+		payload.AuthorPlayerID = top.AuthorPlayerID
+		payload.Author = top.AuthorDisplayName
+	}
+	result.payload = payload
+
+	authorVar := top.AuthorDisplayName
+	if anon {
+		// Empty-string var lets the CueCableLeak template skip
+		// attribution; the prompt instructs the narrator to say the
+		// author is "unknown" in that case.
+		authorVar = ""
+	}
 	if np := h.synthesiseLeak(ctx, narrator.Cue{
 		Kind: narrator.CueCableLeak,
-		Vars: map[string]string{"author": top.AuthorDisplayName, "body": top.Body},
+		Vars: map[string]string{"author": authorVar, "body": top.Body},
 	}); np != nil {
 		result.narratorPayload = np
 	}

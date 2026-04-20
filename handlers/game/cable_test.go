@@ -254,6 +254,9 @@ func TestCablePhase_LeakFlow_PicksTopCable(t *testing.T) {
 	g.Rules.CablePhaseMode = replicant.CableModeEveryRound
 	g.Rules.CablePhaseDurationSec = 60
 	g.Rules.CableLeakSilenceChance = 0 // force a leak
+	// This test asserts the author round-trips into the leaked payload,
+	// which the anonymous-leak default would strip. Disable it.
+	g.Rules.AnonymousCableLeaks = false
 	if err := h.saveGame(ctx, g); err != nil {
 		t.Fatalf("saveGame: %v", err)
 	}

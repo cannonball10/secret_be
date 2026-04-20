@@ -76,7 +76,7 @@ var cuePrompts = map[CueKind]string{
 
 	CueClosing: `The session has concluded. Victor: {{winner}}. Condition: {{condition}}. Deliver a brief closing statement. Do not congratulate individual players; thank the delegation collectively. One to two sentences.`,
 
-	CueCableLeak: `The Committee's signals analysts flagged one cable from the recent Cable Phase for broadcast. Author: {{author}}. The cable reads, verbatim: "{{body}}". Announce the interception and read the quoted body aloud inside your script. Frame the cable as having drawn the Committee's attention; do not reveal your own interpretation or accuse the author of anything specific. One to two sentences.`,
+	CueCableLeak: `The Committee's signals analysts flagged one cable from the recent Cable Phase for broadcast. Author: {{author}}. The cable reads, verbatim: "{{body}}". Announce the interception and read the quoted body aloud inside your script. Frame the cable as having drawn the Committee's attention; do not reveal your own interpretation or accuse the author of anything specific. If the Author field is empty, the source was unattributed — say the cable came in "from an unidentified delegate" or "source unattributed" and do NOT guess a name. One to two sentences.`,
 
 	CueCableSilence: `The Committee reviewed this round's diplomatic traffic and found nothing worth broadcasting. Acknowledge the review in a single sentence. A faint note of disappointment is permitted, in the register of a bureaucrat cataloguing uneventful mail.`,
 

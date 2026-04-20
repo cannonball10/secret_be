@@ -59,6 +59,16 @@ export class MobileApi {
     return this.post(`/api/v1/games/${gameId}/player/chat`, { channel, body });
   }
 
+  /** Send a direct message to another delegate. Open at any time
+   *  during active play — no phase gate server-side. */
+  sendDM(
+    gameId: string,
+    recipientPlayerId: string,
+    body: string,
+  ): Promise<{ status: string }> {
+    return this.post(`/api/v1/games/${gameId}/player/dm`, { recipientPlayerId, body });
+  }
+
   private get<T>(path: string): Promise<T> {
     return this.request<T>("GET", path);
   }
