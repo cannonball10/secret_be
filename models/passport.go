@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // PassportKeys provides key construction for the Passport model.
@@ -60,20 +60,20 @@ func (p *Passport) GSIs() map[int]GSIKeyPair { return nil }
 // RecordGame increments the passport for a completed game's outcome.
 // role is the role the user played; won indicates whether their party
 // won. The caller is responsible for also writing a PassportEntry.
-func (p *Passport) RecordGame(role secrethitler.Role, won bool, endedAt time.Time) {
+func (p *Passport) RecordGame(role replicant.Role, won bool, endedAt time.Time) {
 	p.GamesPlayed++
 	switch role {
-	case secrethitler.RoleLiberal:
+	case replicant.RoleLiberal:
 		p.TimesLiberal++
 		if won {
 			p.WinsAsLiberal++
 		}
-	case secrethitler.RoleFascist:
+	case replicant.RoleFascist:
 		p.TimesFascist++
 		if won {
 			p.WinsAsFascist++
 		}
-	case secrethitler.RoleHitler:
+	case replicant.RoleHitler:
 		p.TimesHitler++
 		if won {
 			p.WinsAsHitler++
@@ -94,10 +94,10 @@ type PassportEntry struct {
 	UserID       string                    `json:"userId"`
 	GameID       string                    `json:"gameId"`
 	PlayerID     string                    `json:"playerId"`
-	Role         secrethitler.Role         `json:"role"`
-	Party        secrethitler.Party        `json:"party"`
+	Role         replicant.Role         `json:"role"`
+	Party        replicant.Party        `json:"party"`
 	Won          bool                      `json:"won"`
-	WinCondition secrethitler.WinCondition `json:"winCondition,omitempty"`
+	WinCondition replicant.WinCondition `json:"winCondition,omitempty"`
 	Seat         int                       `json:"seat"`
 	PlayerCount  int                       `json:"playerCount"`
 	StartedAt    time.Time                 `json:"startedAt"`
@@ -105,7 +105,7 @@ type PassportEntry struct {
 }
 
 // NewPassportEntry creates a PassportEntry for a completed game.
-func NewPassportEntry(userID, gameID, playerID string, role secrethitler.Role, party secrethitler.Party, won bool, winCondition secrethitler.WinCondition, seat, playerCount int, startedAt, endedAt time.Time) *PassportEntry {
+func NewPassportEntry(userID, gameID, playerID string, role replicant.Role, party replicant.Party, won bool, winCondition replicant.WinCondition, seat, playerCount int, startedAt, endedAt time.Time) *PassportEntry {
 	return &PassportEntry{
 		Timestamps:   NewTimestamps(),
 		UserID:       userID,

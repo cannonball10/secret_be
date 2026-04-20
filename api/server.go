@@ -1,4 +1,4 @@
-// Package api exposes the Secret Hitler backend over HTTP using Gin.
+// Package api exposes the Replicant backend over HTTP using Gin.
 //
 // The API is split into two device families:
 //

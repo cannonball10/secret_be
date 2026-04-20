@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // NominateChancellor is invoked by the current president to pick their
@@ -18,7 +18,7 @@ func (h *GameHandler) NominateChancellor(ctx context.Context, gameID, presidentP
 	if err != nil {
 		return nil, err
 	}
-	if err := mustPhase(game, secrethitler.PhaseNomination); err != nil {
+	if err := mustPhase(game, replicant.PhaseNomination); err != nil {
 		return nil, err
 	}
 
@@ -53,15 +53,15 @@ func (h *GameHandler) NominateChancellor(ctx context.Context, gameID, presidentP
 	// jump straight to election (vanilla flow). Either way the
 	// deadline reported to the chancellor_nominated listener is the
 	// *next* phase's, so clients can pace their UI correctly.
-	nextPhase := secrethitler.PhaseElection
-	if game.Rules.CablePhaseMode == secrethitler.CableModeEveryRound {
-		nextPhase = secrethitler.PhaseCablePhase
+	nextPhase := replicant.PhaseElection
+	if game.Rules.CablePhaseMode == replicant.CableModeEveryRound {
+		nextPhase = replicant.PhaseCablePhase
 	}
 	deadlineStr := ""
 	if d := h.deadlineFor(game, nextPhase); d != nil {
 		deadlineStr = d.UTC().Format(time.RFC3339)
 	}
-	ev := models.NewGameEvent(gameID, secrethitler.EventChancellorNominated, president.PlayerID).
+	ev := models.NewGameEvent(gameID, replicant.EventChancellorNominated, president.PlayerID).
 		WithTarget(chancellor.PlayerID)
 	h.broadcast(ctx, ev, ChancellorNominatedPayload{
 		PresidentPlayerID:  president.PlayerID,
@@ -72,11 +72,11 @@ func (h *GameHandler) NominateChancellor(ctx context.Context, gameID, presidentP
 	})
 
 	h.setPhase(ctx, game, nextPhase, ReasonAction)
-	if nextPhase == secrethitler.PhaseCablePhase {
+	if nextPhase == replicant.PhaseCablePhase {
 		// Surface a dedicated opener event so clients can mount
 		// chat controls without sniffing phase_changed. Payload is
 		// empty today; step 3b adds chat-specific fields.
-		openEv := models.NewGameEvent(gameID, secrethitler.EventCablePhaseOpened, "")
+		openEv := models.NewGameEvent(gameID, replicant.EventCablePhaseOpened, "")
 		h.broadcast(ctx, openEv, CablePhaseOpenedPayload{
 			GovernmentID: gov.GovernmentID,
 			Deadline:     deadlineStr,

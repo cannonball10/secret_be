@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Replicant** is a social-deduction party game in the vein of Secret Hitler, Among Us, and Mafia — but played **in the real world** using:
+**Replicant** is a social-deduction party game in the vein of Among Us, Mafia, and similar hidden-role classics — but played **in the real world** using:
 - A **Host display** (TV / desktop / laptop) — driven by an AI narrator using LLM inference + TTS
 - **Mobile devices** — each player uses their phone to see their role, vote, chat, and handle tasks
 

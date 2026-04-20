@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // EnactedPolicyKeys provides key construction for the EnactedPolicy model.
@@ -19,7 +19,7 @@ type EnactedPolicy struct {
 
 	GameID       string                  `json:"gameId"`
 	Sequence     int                     `json:"sequence"`
-	Type         secrethitler.PolicyType `json:"type"`
+	Type         replicant.PolicyType `json:"type"`
 	GovernmentID string                  `json:"governmentId,omitempty"`
 	// TopDeck is true when the policy was force-enacted by the election
 	// tracker rather than by a passed government.
@@ -33,7 +33,7 @@ func policySK(sequence int) string {
 }
 
 // NewEnactedPolicy creates an EnactedPolicy record.
-func NewEnactedPolicy(gameID string, sequence int, t secrethitler.PolicyType, governmentID string, topDeck bool) *EnactedPolicy {
+func NewEnactedPolicy(gameID string, sequence int, t replicant.PolicyType, governmentID string, topDeck bool) *EnactedPolicy {
 	return &EnactedPolicy{
 		Timestamps:   NewTimestamps(),
 		GameID:       gameID,

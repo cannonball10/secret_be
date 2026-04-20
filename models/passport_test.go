@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 func TestNewPassport(t *testing.T) {
@@ -31,9 +31,9 @@ func TestPassport_RecordGame(t *testing.T) {
 	p := NewPassport("u")
 	ended := time.Now().UTC()
 
-	p.RecordGame(secrethitler.RoleLiberal, true, ended)
-	p.RecordGame(secrethitler.RoleFascist, false, ended)
-	p.RecordGame(secrethitler.RoleHitler, true, ended)
+	p.RecordGame(replicant.RoleLiberal, true, ended)
+	p.RecordGame(replicant.RoleFascist, false, ended)
+	p.RecordGame(replicant.RoleHitler, true, ended)
 
 	if p.GamesPlayed != 3 {
 		t.Errorf("GamesPlayed = %d, want 3", p.GamesPlayed)
@@ -58,8 +58,8 @@ func TestNewPassportEntry(t *testing.T) {
 	start := time.Now().Add(-time.Hour)
 	end := time.Now()
 	e := NewPassportEntry("U1", "G1", "P1",
-		secrethitler.RoleHitler, secrethitler.PartyFascist,
-		false, secrethitler.WinHitlerExecuted,
+		replicant.RoleHitler, replicant.PartyFascist,
+		false, replicant.WinHitlerExecuted,
 		3, 7, start, end)
 
 	if e.PK() != "PASSPORT#U1" {
@@ -68,7 +68,7 @@ func TestNewPassportEntry(t *testing.T) {
 	if e.SK() != "ENTRY#G1" {
 		t.Errorf("SK() = %q", e.SK())
 	}
-	if e.Role != secrethitler.RoleHitler {
+	if e.Role != replicant.RoleHitler {
 		t.Errorf("Role = %q", e.Role)
 	}
 	if e.Won {

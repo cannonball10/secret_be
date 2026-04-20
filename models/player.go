@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 	"github.com/cannonball10/foundation/utils"
 )
 
@@ -36,8 +36,8 @@ type Player struct {
 	// Role and Party are assigned at game start. Party tracks what other
 	// players would see on an investigation card (Hitler investigates as
 	// a fascist but has his own role).
-	Role  secrethitler.Role  `json:"role,omitempty"`
-	Party secrethitler.Party `json:"party,omitempty"`
+	Role  replicant.Role  `json:"role,omitempty"`
+	Party replicant.Party `json:"party,omitempty"`
 
 	IsHost      bool `json:"isHost"`
 	IsAlive     bool `json:"isAlive"`
@@ -86,9 +86,9 @@ func (p *Player) GSIs() map[int]GSIKeyPair {
 }
 
 // AssignRole sets a player's secret role and derives the party.
-func (p *Player) AssignRole(role secrethitler.Role) {
+func (p *Player) AssignRole(role replicant.Role) {
 	p.Role = role
-	p.Party = secrethitler.PartyFor(role)
+	p.Party = replicant.PartyFor(role)
 	p.Touch()
 }
 
@@ -101,13 +101,13 @@ func (p *Player) Kill() {
 
 // IsRogue returns true if this player was assigned the Hitler role.
 func (p *Player) IsRogue() bool {
-	return p.Role == secrethitler.RoleRogue
+	return p.Role == replicant.RoleRogue
 }
 
 // IsSingularity returns true if this player was assigned the
 // Singularity role (only dealt when Rules.EnableSingularity is on).
 func (p *Player) IsSingularity() bool {
-	return p.Role == secrethitler.RoleSingularity
+	return p.Role == replicant.RoleSingularity
 }
 
 // MarkInvestigatedBy records that the given investigator seat has now

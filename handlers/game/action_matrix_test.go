@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // driveStrategy is a bundle of per-phase preferences passed to driveGame.
@@ -17,10 +17,10 @@ import (
 type driveStrategy struct {
 	// preferEnact controls which policy the chancellor tries to enact
 	// when the draw gives a choice. Empty string means "first option".
-	preferEnact secrethitler.PolicyType
+	preferEnact replicant.PolicyType
 	// preferDiscard controls which policy the president tries to
 	// discard. Empty string means "first policy".
-	preferDiscard secrethitler.PolicyType
+	preferDiscard replicant.PolicyType
 	// targetHitler toggles targeting Hitler on Execution when possible.
 	targetHitler bool
 	// nominateHitler toggles nominating Hitler when eligible.
@@ -58,13 +58,13 @@ func driveGame(t *testing.T, seed uint64, playerCount int, strat driveStrategy, 
 		if err != nil {
 			t.Fatalf("step %d: loadGame: %v", step, err)
 		}
-		if game.Status == secrethitler.GameStatusCompleted {
+		if game.Status == replicant.GameStatusCompleted {
 			return newCoverageReport(cap), game
 		}
 		players, _ := h.loadPlayers(ctx, g.GameID)
 
 		switch game.Phase {
-		case secrethitler.PhaseNomination:
+		case replicant.PhaseNomination:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			chancellor := pickChancellorStrategy(game, players, president, hitler, strat)
 			if chancellor == nil {
@@ -74,16 +74,16 @@ func driveGame(t *testing.T, seed uint64, playerCount int, strat driveStrategy, 
 				t.Fatalf("step %d: nominate: %v", step, err)
 			}
 
-		case secrethitler.PhaseElection:
+		case replicant.PhaseElection:
 			for _, p := range alivePlayers(players) {
-				_ = h.CastVote(ctx, g.GameID, p.PlayerID, secrethitler.VoteJa)
+				_ = h.CastVote(ctx, g.GameID, p.PlayerID, replicant.VoteJa)
 				g2, _ := h.loadGame(ctx, g.GameID)
-				if g2.Phase != secrethitler.PhaseElection {
+				if g2.Phase != replicant.PhaseElection {
 					break
 				}
 			}
 
-		case secrethitler.PhaseLegislativePresident:
+		case replicant.PhaseLegislativePresident:
 			gov, err := h.loadGovernment(ctx, g.GameID, game.CurrentGovernmentID)
 			if err != nil {
 				t.Fatalf("step %d: loadGovernment: %v", step, err)
@@ -94,7 +94,7 @@ func driveGame(t *testing.T, seed uint64, playerCount int, strat driveStrategy, 
 				t.Fatalf("step %d: discard: %v", step, err)
 			}
 
-		case secrethitler.PhaseLegislativeChancellor:
+		case replicant.PhaseLegislativeChancellor:
 			gov, _ := h.loadGovernment(ctx, g.GameID, game.CurrentGovernmentID)
 			chancellor := findPlayerBySeat(players, *game.ChancellorSeat)
 			// Veto is proposable only if the chancellor hasn't already
@@ -111,13 +111,13 @@ func driveGame(t *testing.T, seed uint64, playerCount int, strat driveStrategy, 
 				}
 			}
 
-		case secrethitler.PhaseVetoRequested:
+		case replicant.PhaseVetoRequested:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			if err := h.ResolveVeto(ctx, g.GameID, president.PlayerID, strat.acceptVeto); err != nil {
 				t.Fatalf("step %d: resolve veto: %v", step, err)
 			}
 
-		case secrethitler.PhaseExecutiveAction:
+		case replicant.PhaseExecutiveAction:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			target := pickExecutiveTargetStrategy(game, players, president, hitler, strat)
 			if target == nil {
@@ -138,7 +138,7 @@ func driveGame(t *testing.T, seed uint64, playerCount int, strat driveStrategy, 
 // pickDiscardIndex returns the index of a policy to discard. If
 // prefer is set, it discards one of that type when available. Otherwise
 // it returns 0.
-func pickDiscardIndex(drawn []secrethitler.PolicyType, prefer secrethitler.PolicyType) int {
+func pickDiscardIndex(drawn []replicant.PolicyType, prefer replicant.PolicyType) int {
 	if prefer == "" {
 		return 0
 	}
@@ -152,7 +152,7 @@ func pickDiscardIndex(drawn []secrethitler.PolicyType, prefer secrethitler.Polic
 
 // pickEnactIndex returns the index of a policy to enact, preferring the
 // given type when available.
-func pickEnactIndex(options []secrethitler.PolicyType, prefer secrethitler.PolicyType) int {
+func pickEnactIndex(options []replicant.PolicyType, prefer replicant.PolicyType) int {
 	if prefer == "" {
 		return 0
 	}
@@ -176,7 +176,7 @@ func pickChancellorStrategy(game *models.Game, players []*models.Player, preside
 // pickExecutiveTargetStrategy picks a target for an executive action,
 // favouring Hitler on Execution when the strategy requests it.
 func pickExecutiveTargetStrategy(game *models.Game, players []*models.Player, president *models.Player, hitler *models.Player, strat driveStrategy) *models.Player {
-	if strat.targetHitler && game.PendingActionType == secrethitler.ActionExecution &&
+	if strat.targetHitler && game.PendingActionType == replicant.ActionExecution &&
 		hitler != nil && hitler.IsAlive && hitler.PlayerID != president.PlayerID {
 		return hitler
 	}
@@ -202,14 +202,14 @@ func isEligibleChancellor(game *models.Game, players []*models.Player, president
 // observed during a driveGame run. Asserting on these fields keeps
 // the per-player-count tests concise.
 type coverageReport struct {
-	eventCounts map[secrethitler.EventType]int
-	powers      map[secrethitler.ExecutiveActionType]int
+	eventCounts map[replicant.EventType]int
+	powers      map[replicant.ExecutiveActionType]int
 }
 
 func newCoverageReport(cap *captureEmitter) *coverageReport {
 	r := &coverageReport{
-		eventCounts: make(map[secrethitler.EventType]int),
-		powers:      make(map[secrethitler.ExecutiveActionType]int),
+		eventCounts: make(map[replicant.EventType]int),
+		powers:      make(map[replicant.ExecutiveActionType]int),
 	}
 	cap.mu.Lock()
 	defer cap.mu.Unlock()
@@ -237,24 +237,24 @@ func (r *coverageReport) merge(other *coverageReport) {
 
 // expectedPowers returns the set of executive powers that must appear
 // over the course of testing for the given player count.
-func expectedPowers(playerCount int) []secrethitler.ExecutiveActionType {
+func expectedPowers(playerCount int) []replicant.ExecutiveActionType {
 	switch {
 	case playerCount >= 9:
-		return []secrethitler.ExecutiveActionType{
-			secrethitler.ActionInvestigateLoyalty,
-			secrethitler.ActionSpecialElection,
-			secrethitler.ActionExecution,
+		return []replicant.ExecutiveActionType{
+			replicant.ActionInvestigateLoyalty,
+			replicant.ActionSpecialElection,
+			replicant.ActionExecution,
 		}
 	case playerCount >= 7:
-		return []secrethitler.ExecutiveActionType{
-			secrethitler.ActionInvestigateLoyalty,
-			secrethitler.ActionSpecialElection,
-			secrethitler.ActionExecution,
+		return []replicant.ExecutiveActionType{
+			replicant.ActionInvestigateLoyalty,
+			replicant.ActionSpecialElection,
+			replicant.ActionExecution,
 		}
 	default: // 5-6
-		return []secrethitler.ExecutiveActionType{
-			secrethitler.ActionPolicyPeek,
-			secrethitler.ActionExecution,
+		return []replicant.ExecutiveActionType{
+			replicant.ActionPolicyPeek,
+			replicant.ActionExecution,
 		}
 	}
 }
@@ -276,32 +276,32 @@ func TestActionMatrix_AllPlayerCounts(t *testing.T) {
 		strategy driveStrategy
 	}{
 		{"fascist_win_enact_fascist", driveStrategy{
-			preferEnact:   secrethitler.PolicyAI,
-			preferDiscard: secrethitler.PolicyHuman,
+			preferEnact:   replicant.PolicyAI,
+			preferDiscard: replicant.PolicyHuman,
 		}},
 		{"liberal_win_enact_liberal", driveStrategy{
-			preferEnact:   secrethitler.PolicyHuman,
-			preferDiscard: secrethitler.PolicyAI,
+			preferEnact:   replicant.PolicyHuman,
+			preferDiscard: replicant.PolicyAI,
 		}},
 		{"hitler_chancellor", driveStrategy{
-			preferEnact:    secrethitler.PolicyAI,
-			preferDiscard:  secrethitler.PolicyHuman,
+			preferEnact:    replicant.PolicyAI,
+			preferDiscard:  replicant.PolicyHuman,
 			nominateHitler: true,
 		}},
 		{"rogue_executed", driveStrategy{
-			preferEnact:   secrethitler.PolicyAI,
-			preferDiscard: secrethitler.PolicyHuman,
+			preferEnact:   replicant.PolicyAI,
+			preferDiscard: replicant.PolicyHuman,
 			targetHitler:  true,
 		}},
 		{"veto_accept", driveStrategy{
-			preferEnact:   secrethitler.PolicyAI,
-			preferDiscard: secrethitler.PolicyHuman,
+			preferEnact:   replicant.PolicyAI,
+			preferDiscard: replicant.PolicyHuman,
 			proposeVeto:   true,
 			acceptVeto:    true,
 		}},
 		{"veto_reject", driveStrategy{
-			preferEnact:   secrethitler.PolicyAI,
-			preferDiscard: secrethitler.PolicyHuman,
+			preferEnact:   replicant.PolicyAI,
+			preferDiscard: replicant.PolicyHuman,
 			proposeVeto:   true,
 			acceptVeto:    false,
 		}},
@@ -312,7 +312,7 @@ func TestActionMatrix_AllPlayerCounts(t *testing.T) {
 		playerCount := playerCount
 		t.Run(fmt.Sprintf("players=%d", playerCount), func(t *testing.T) {
 			agg := newCoverageReport(&captureEmitter{})
-			winConditions := make(map[secrethitler.WinCondition]int)
+			winConditions := make(map[replicant.WinCondition]int)
 
 			for _, strat := range strategies {
 				strat := strat
@@ -320,7 +320,7 @@ func TestActionMatrix_AllPlayerCounts(t *testing.T) {
 					seed := seed
 					t.Run(fmt.Sprintf("%s/seed=%d", strat.name, seed), func(t *testing.T) {
 						rep, final := driveGame(t, seed+uint64(playerCount*101), playerCount, strat.strategy, 2000)
-						if final.Status != secrethitler.GameStatusCompleted {
+						if final.Status != replicant.GameStatusCompleted {
 							t.Fatalf("game did not complete: %s", summarize(final))
 						}
 						winConditions[final.WinCondition]++
@@ -338,21 +338,21 @@ func TestActionMatrix_AllPlayerCounts(t *testing.T) {
 			}
 
 			// Assert every game-mechanic event occurred.
-			requiredEvents := []secrethitler.EventType{
-				secrethitler.EventGameCreated,
-				secrethitler.EventPlayerJoined,
-				secrethitler.EventGameStarted,
-				secrethitler.EventRolesAssigned,
-				secrethitler.EventChancellorNominated,
-				secrethitler.EventVoteCast,
-				secrethitler.EventElectionResult,
-				secrethitler.EventPoliciesDrawn,
-				secrethitler.EventPresidentDiscarded,
-				secrethitler.EventChancellorEnacted,
-				secrethitler.EventVetoProposed,
-				secrethitler.EventVetoResolved,
-				secrethitler.EventExecutiveAction,
-				secrethitler.EventGameEnded,
+			requiredEvents := []replicant.EventType{
+				replicant.EventGameCreated,
+				replicant.EventPlayerJoined,
+				replicant.EventGameStarted,
+				replicant.EventRolesAssigned,
+				replicant.EventChancellorNominated,
+				replicant.EventVoteCast,
+				replicant.EventElectionResult,
+				replicant.EventPoliciesDrawn,
+				replicant.EventPresidentDiscarded,
+				replicant.EventChancellorEnacted,
+				replicant.EventVetoProposed,
+				replicant.EventVetoResolved,
+				replicant.EventExecutiveAction,
+				replicant.EventGameEnded,
 			}
 			for _, ev := range requiredEvents {
 				if agg.eventCounts[ev] == 0 {
@@ -363,16 +363,16 @@ func TestActionMatrix_AllPlayerCounts(t *testing.T) {
 
 			// At 5+ players, the board always reaches enough policies to
 			// top-deck at least once across the 60 games per player count.
-			if agg.eventCounts[secrethitler.EventTopDeckEnacted] == 0 {
+			if agg.eventCounts[replicant.EventTopDeckEnacted] == 0 {
 				t.Logf("note: no top-deck events at %d players (not mandatory)", playerCount)
 			}
 
 			// All four win conditions should be seen across the strategies.
-			for _, wc := range []secrethitler.WinCondition{
-				secrethitler.WinHumanPolicies,
-				secrethitler.WinAIPolicies,
-				secrethitler.WinRogueElected,
-				secrethitler.WinRogueExecuted,
+			for _, wc := range []replicant.WinCondition{
+				replicant.WinHumanPolicies,
+				replicant.WinAIPolicies,
+				replicant.WinRogueElected,
+				replicant.WinRogueExecuted,
 			} {
 				if winConditions[wc] == 0 {
 					t.Logf("note: win condition %s never produced at %d players (strategy coverage)", wc, playerCount)
@@ -391,11 +391,11 @@ func TestActions_ForceProgressAcrossPhases(t *testing.T) {
 	for _, playerCount := range []int{5, 6, 7, 8, 9, 10} {
 		playerCount := playerCount
 		t.Run(fmt.Sprintf("players=%d", playerCount), func(t *testing.T) {
-			phases := []secrethitler.GamePhase{
-				secrethitler.PhaseNomination,
-				secrethitler.PhaseElection,
-				secrethitler.PhaseLegislativePresident,
-				secrethitler.PhaseLegislativeChancellor,
+			phases := []replicant.GamePhase{
+				replicant.PhaseNomination,
+				replicant.PhaseElection,
+				replicant.PhaseLegislativePresident,
+				replicant.PhaseLegislativeChancellor,
 			}
 			for _, target := range phases {
 				target := target
@@ -420,7 +420,7 @@ func TestActions_ForceProgressAcrossPhases(t *testing.T) {
 					// Forward progress: either the phase changed OR the
 					// round advanced past the state that was in place
 					// right before ForceProgress ran.
-					if after.Phase == target && after.Round <= midRound && after.Status != secrethitler.GameStatusCompleted {
+					if after.Phase == target && after.Round <= midRound && after.Status != replicant.GameStatusCompleted {
 						t.Errorf("no forward progress after ForceProgress from %s: midRound=%d after=(%s)",
 							target, midRound, summarize(after))
 					}
@@ -450,9 +450,9 @@ func TestActions_TimerExpiredAcrossPhases(t *testing.T) {
 	for _, playerCount := range []int{5, 6, 7, 8, 9, 10} {
 		playerCount := playerCount
 		t.Run(fmt.Sprintf("players=%d", playerCount), func(t *testing.T) {
-			for _, target := range []secrethitler.GamePhase{
-				secrethitler.PhaseNomination,
-				secrethitler.PhaseElection,
+			for _, target := range []replicant.GamePhase{
+				replicant.PhaseNomination,
+				replicant.PhaseElection,
 			} {
 				target := target
 				t.Run(string(target), func(t *testing.T) {
@@ -488,7 +488,7 @@ func TestActions_TimerExpiredAcrossPhases(t *testing.T) {
 // advanceTo progresses the game from Nomination into the requested
 // phase by making minimal legal moves. Used by the ForceProgress and
 // TimerExpired tests to set up each phase without extra strategy.
-func advanceTo(t *testing.T, h *GameHandler, gameID string, phase secrethitler.GamePhase) {
+func advanceTo(t *testing.T, h *GameHandler, gameID string, phase replicant.GamePhase) {
 	t.Helper()
 	ctx := context.Background()
 	for step := 0; step < 30; step++ {
@@ -498,21 +498,21 @@ func advanceTo(t *testing.T, h *GameHandler, gameID string, phase secrethitler.G
 		}
 		players, _ := h.loadPlayers(ctx, gameID)
 		switch game.Phase {
-		case secrethitler.PhaseNomination:
+		case replicant.PhaseNomination:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			chancellor := pickChancellor(game, players, president)
 			if _, err := h.NominateChancellor(ctx, gameID, president.PlayerID, chancellor.PlayerID); err != nil {
 				t.Fatalf("advance nominate: %v", err)
 			}
-		case secrethitler.PhaseElection:
+		case replicant.PhaseElection:
 			for _, p := range alivePlayers(players) {
-				_ = h.CastVote(ctx, gameID, p.PlayerID, secrethitler.VoteJa)
+				_ = h.CastVote(ctx, gameID, p.PlayerID, replicant.VoteJa)
 				g2, _ := h.loadGame(ctx, gameID)
-				if g2.Phase != secrethitler.PhaseElection {
+				if g2.Phase != replicant.PhaseElection {
 					break
 				}
 			}
-		case secrethitler.PhaseLegislativePresident:
+		case replicant.PhaseLegislativePresident:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			if err := h.PresidentDiscard(ctx, gameID, president.PlayerID, 0); err != nil {
 				t.Fatalf("advance discard: %v", err)

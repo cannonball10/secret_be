@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // playFullGame drives the engine through the rules-legal actions for
@@ -21,7 +21,7 @@ func playFullGame(t *testing.T, h *GameHandler, gameID string, maxSteps int) *mo
 		if err != nil {
 			t.Fatalf("step %d: loadGame: %v", step, err)
 		}
-		if game.Status == secrethitler.GameStatusCompleted {
+		if game.Status == replicant.GameStatusCompleted {
 			return game
 		}
 		players, err := h.loadPlayers(ctx, gameID)
@@ -30,7 +30,7 @@ func playFullGame(t *testing.T, h *GameHandler, gameID string, maxSteps int) *mo
 		}
 
 		switch game.Phase {
-		case secrethitler.PhaseNomination:
+		case replicant.PhaseNomination:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			if president == nil {
 				t.Fatalf("step %d: no president at seat %d", step, game.PresidentSeat)
@@ -43,28 +43,28 @@ func playFullGame(t *testing.T, h *GameHandler, gameID string, maxSteps int) *mo
 				t.Fatalf("step %d: NominateChancellor: %v", step, err)
 			}
 
-		case secrethitler.PhaseElection:
+		case replicant.PhaseElection:
 			// All alive players vote ja.
 			for _, p := range alivePlayers(players) {
-				if err := h.CastVote(ctx, gameID, p.PlayerID, secrethitler.VoteJa); err != nil {
+				if err := h.CastVote(ctx, gameID, p.PlayerID, replicant.VoteJa); err != nil {
 					t.Fatalf("step %d: CastVote(%s): %v", step, p.PlayerID, err)
 				}
 				// The last vote resolves the election inline; re-check
 				// phase so we don't try to vote as someone else on a
 				// game that has already advanced.
 				g2, _ := h.loadGame(ctx, gameID)
-				if g2.Phase != secrethitler.PhaseElection {
+				if g2.Phase != replicant.PhaseElection {
 					break
 				}
 			}
 
-		case secrethitler.PhaseLegislativePresident:
+		case replicant.PhaseLegislativePresident:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			if err := h.PresidentDiscard(ctx, gameID, president.PlayerID, 0); err != nil {
 				t.Fatalf("step %d: PresidentDiscard: %v", step, err)
 			}
 
-		case secrethitler.PhaseLegislativeChancellor:
+		case replicant.PhaseLegislativeChancellor:
 			if game.ChancellorSeat == nil {
 				t.Fatalf("step %d: ChancellorSeat nil in LegislativeChancellor", step)
 			}
@@ -73,14 +73,14 @@ func playFullGame(t *testing.T, h *GameHandler, gameID string, maxSteps int) *mo
 				t.Fatalf("step %d: ChancellorEnact: %v", step, err)
 			}
 
-		case secrethitler.PhaseVetoRequested:
+		case replicant.PhaseVetoRequested:
 			// Reject by default so we keep making progress.
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			if err := h.ResolveVeto(ctx, gameID, president.PlayerID, false); err != nil {
 				t.Fatalf("step %d: ResolveVeto: %v", step, err)
 			}
 
-		case secrethitler.PhaseExecutiveAction:
+		case replicant.PhaseExecutiveAction:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			target := pickExecutiveTarget(game, players, president)
 			if target == nil {
@@ -125,7 +125,7 @@ func pickExecutiveTarget(game *models.Game, players []*models.Player, president 
 		if p.PlayerID == president.PlayerID {
 			continue
 		}
-		if game.PendingActionType == secrethitler.ActionInvestigateLoyalty && seatAlreadyInvestigated(p, president.Seat) {
+		if game.PendingActionType == replicant.ActionInvestigateLoyalty && seatAlreadyInvestigated(p, president.Seat) {
 			continue
 		}
 		return p
@@ -171,7 +171,7 @@ func TestFullGameLoop_EndsInWin(t *testing.T) {
 	}
 
 	final := playFullGame(t, h, g.GameID, 500)
-	if final.Status != secrethitler.GameStatusCompleted {
+	if final.Status != replicant.GameStatusCompleted {
 		t.Fatalf("status = %s, want completed", final.Status)
 	}
 	if final.Winner == "" || final.WinCondition == "" {
@@ -199,7 +199,7 @@ func TestFullGameLoop_MultipleSeeds(t *testing.T) {
 				t.Fatalf("StartGame: %v", err)
 			}
 			final := playFullGame(t, h, g.GameID, 500)
-			if final.Status != secrethitler.GameStatusCompleted {
+			if final.Status != replicant.GameStatusCompleted {
 				t.Fatalf("did not complete, got status=%s phase=%s",
 					final.Status, final.Phase)
 			}
@@ -235,7 +235,7 @@ func TestFullGameLoop_LargerTables(t *testing.T) {
 				t.Fatalf("StartGame: %v", err)
 			}
 			final := playFullGame(t, h, g.GameID, 500)
-			if final.Status != secrethitler.GameStatusCompleted {
+			if final.Status != replicant.GameStatusCompleted {
 				t.Fatalf("did not complete: %s", summarize(final))
 			}
 		})
@@ -245,7 +245,7 @@ func TestFullGameLoop_LargerTables(t *testing.T) {
 // playFullGameMixed drives the engine with a supplied per-phase strategy.
 // The voteChoice function decides each player's vote so tests can force
 // election-tracker advancements and other failure paths.
-func playFullGameMixed(t *testing.T, h *GameHandler, gameID string, maxSteps int, voteChoice func(step int, p *models.Player) secrethitler.VoteChoice) *models.Game {
+func playFullGameMixed(t *testing.T, h *GameHandler, gameID string, maxSteps int, voteChoice func(step int, p *models.Player) replicant.VoteChoice) *models.Game {
 	t.Helper()
 	ctx := context.Background()
 	electionStep := 0
@@ -254,13 +254,13 @@ func playFullGameMixed(t *testing.T, h *GameHandler, gameID string, maxSteps int
 		if err != nil {
 			t.Fatalf("step %d: loadGame: %v", step, err)
 		}
-		if game.Status == secrethitler.GameStatusCompleted {
+		if game.Status == replicant.GameStatusCompleted {
 			return game
 		}
 		players, _ := h.loadPlayers(ctx, gameID)
 
 		switch game.Phase {
-		case secrethitler.PhaseNomination:
+		case replicant.PhaseNomination:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			chancellor := pickChancellor(game, players, president)
 			if chancellor == nil {
@@ -269,33 +269,33 @@ func playFullGameMixed(t *testing.T, h *GameHandler, gameID string, maxSteps int
 			if _, err := h.NominateChancellor(ctx, gameID, president.PlayerID, chancellor.PlayerID); err != nil {
 				t.Fatalf("step %d: nominate: %v", step, err)
 			}
-		case secrethitler.PhaseElection:
+		case replicant.PhaseElection:
 			for _, p := range alivePlayers(players) {
 				if err := h.CastVote(ctx, gameID, p.PlayerID, voteChoice(electionStep, p)); err != nil {
 					t.Fatalf("step %d: vote: %v", step, err)
 				}
 				g2, _ := h.loadGame(ctx, gameID)
-				if g2.Phase != secrethitler.PhaseElection {
+				if g2.Phase != replicant.PhaseElection {
 					break
 				}
 			}
 			electionStep++
-		case secrethitler.PhaseLegislativePresident:
+		case replicant.PhaseLegislativePresident:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			if err := h.PresidentDiscard(ctx, gameID, president.PlayerID, 0); err != nil {
 				t.Fatalf("step %d: discard: %v", step, err)
 			}
-		case secrethitler.PhaseLegislativeChancellor:
+		case replicant.PhaseLegislativeChancellor:
 			chancellor := findPlayerBySeat(players, *game.ChancellorSeat)
 			if err := h.ChancellorEnact(ctx, gameID, chancellor.PlayerID, 0); err != nil {
 				t.Fatalf("step %d: enact: %v", step, err)
 			}
-		case secrethitler.PhaseVetoRequested:
+		case replicant.PhaseVetoRequested:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			if err := h.ResolveVeto(ctx, gameID, president.PlayerID, false); err != nil {
 				t.Fatalf("step %d: resolve veto: %v", step, err)
 			}
-		case secrethitler.PhaseExecutiveAction:
+		case replicant.PhaseExecutiveAction:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			target := pickExecutiveTarget(game, players, president)
 			if target == nil {
@@ -321,21 +321,21 @@ func TestFullGameLoop_WithFailedElections(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Fail the first two elections (nein), pass the rest (ja).
-	voteChoice := func(step int, _ *models.Player) secrethitler.VoteChoice {
+	voteChoice := func(step int, _ *models.Player) replicant.VoteChoice {
 		if step < 2 {
-			return secrethitler.VoteNein
+			return replicant.VoteNein
 		}
-		return secrethitler.VoteJa
+		return replicant.VoteJa
 	}
 	final := playFullGameMixed(t, h, g.GameID, 500, voteChoice)
-	if final.Status != secrethitler.GameStatusCompleted {
+	if final.Status != replicant.GameStatusCompleted {
 		t.Fatalf("did not complete: %s", summarize(final))
 	}
 	// Confirm at least one top-deck fired (three failed elections in a
 	// row would top-deck, but our pattern only fails two; make this a
 	// soft check that the tracker moved at least once).
 	moved := false
-	for _, env := range cap.envelopesOfType(string(secrethitler.EventElectionTracker)) {
+	for _, env := range cap.envelopesOfType(string(replicant.EventElectionTracker)) {
 		if p, ok := env.Payload.(ElectionTrackerPayload); ok && p.Tracker > 0 {
 			moved = true
 		}
@@ -359,31 +359,31 @@ func TestFullGameLoop_AcceptVetoes(t *testing.T) {
 	ctx := context.Background()
 	for step := 0; step < 1000; step++ {
 		game, _ := h.loadGame(ctx, g.GameID)
-		if game.Status == secrethitler.GameStatusCompleted {
+		if game.Status == replicant.GameStatusCompleted {
 			return
 		}
 		players, _ := h.loadPlayers(ctx, g.GameID)
 		switch game.Phase {
-		case secrethitler.PhaseNomination:
+		case replicant.PhaseNomination:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			chancellor := pickChancellor(game, players, president)
 			if _, err := h.NominateChancellor(ctx, g.GameID, president.PlayerID, chancellor.PlayerID); err != nil {
 				t.Fatal(err)
 			}
-		case secrethitler.PhaseElection:
+		case replicant.PhaseElection:
 			for _, p := range alivePlayers(players) {
-				_ = h.CastVote(ctx, g.GameID, p.PlayerID, secrethitler.VoteJa)
+				_ = h.CastVote(ctx, g.GameID, p.PlayerID, replicant.VoteJa)
 				g2, _ := h.loadGame(ctx, g.GameID)
-				if g2.Phase != secrethitler.PhaseElection {
+				if g2.Phase != replicant.PhaseElection {
 					break
 				}
 			}
-		case secrethitler.PhaseLegislativePresident:
+		case replicant.PhaseLegislativePresident:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			if err := h.PresidentDiscard(ctx, g.GameID, president.PlayerID, 0); err != nil {
 				t.Fatal(err)
 			}
-		case secrethitler.PhaseLegislativeChancellor:
+		case replicant.PhaseLegislativeChancellor:
 			chancellor := findPlayerBySeat(players, *game.ChancellorSeat)
 			// Propose veto if available; otherwise enact.
 			if game.VetoUnlocked {
@@ -395,12 +395,12 @@ func TestFullGameLoop_AcceptVetoes(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-		case secrethitler.PhaseVetoRequested:
+		case replicant.PhaseVetoRequested:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			if err := h.ResolveVeto(ctx, g.GameID, president.PlayerID, true); err != nil {
 				t.Fatal(err)
 			}
-		case secrethitler.PhaseExecutiveAction:
+		case replicant.PhaseExecutiveAction:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			target := pickExecutiveTarget(game, players, president)
 			if err := h.ExecuteAction(ctx, g.GameID, president.PlayerID, target.PlayerID); err != nil {
@@ -436,8 +436,8 @@ func TestFullGameLoop_HitlerExecutedEndsGame(t *testing.T) {
 
 	for step := 0; step < 500; step++ {
 		game, _ := h.loadGame(ctx, g.GameID)
-		if game.Status == secrethitler.GameStatusCompleted {
-			if game.WinCondition != secrethitler.WinRogueExecuted {
+		if game.Status == replicant.GameStatusCompleted {
+			if game.WinCondition != replicant.WinRogueExecuted {
 				t.Logf("game ended before Hitler execution: %s (winner=%s)", game.WinCondition, game.Winner)
 			}
 			return
@@ -445,35 +445,35 @@ func TestFullGameLoop_HitlerExecutedEndsGame(t *testing.T) {
 		players, _ := h.loadPlayers(ctx, g.GameID)
 
 		switch game.Phase {
-		case secrethitler.PhaseNomination:
+		case replicant.PhaseNomination:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			chancellor := pickChancellor(game, players, president)
 			_, _ = h.NominateChancellor(ctx, g.GameID, president.PlayerID, chancellor.PlayerID)
-		case secrethitler.PhaseElection:
+		case replicant.PhaseElection:
 			for _, p := range alivePlayers(players) {
-				_ = h.CastVote(ctx, g.GameID, p.PlayerID, secrethitler.VoteJa)
+				_ = h.CastVote(ctx, g.GameID, p.PlayerID, replicant.VoteJa)
 				g2, _ := h.loadGame(ctx, g.GameID)
-				if g2.Phase != secrethitler.PhaseElection {
+				if g2.Phase != replicant.PhaseElection {
 					break
 				}
 			}
-		case secrethitler.PhaseLegislativePresident:
+		case replicant.PhaseLegislativePresident:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			_ = h.PresidentDiscard(ctx, g.GameID, president.PlayerID, 0)
-		case secrethitler.PhaseLegislativeChancellor:
+		case replicant.PhaseLegislativeChancellor:
 			chancellor := findPlayerBySeat(players, *game.ChancellorSeat)
 			_ = h.ChancellorEnact(ctx, g.GameID, chancellor.PlayerID, 0)
-		case secrethitler.PhaseVetoRequested:
+		case replicant.PhaseVetoRequested:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			_ = h.ResolveVeto(ctx, g.GameID, president.PlayerID, false)
-		case secrethitler.PhaseExecutiveAction:
+		case replicant.PhaseExecutiveAction:
 			president := findPlayerBySeat(players, game.PresidentSeat)
 			// On Execution, always target Hitler (if the president is
 			// Hitler themselves, fall back to a random alive player;
 			// that case can't actually happen since Hitler isn't eligible
 			// to target self).
 			var target *models.Player
-			if game.PendingActionType == secrethitler.ActionExecution && president.PlayerID != hitler.PlayerID && hitler.IsAlive {
+			if game.PendingActionType == replicant.ActionExecution && president.PlayerID != hitler.PlayerID && hitler.IsAlive {
 				target = hitler
 			} else {
 				target = pickExecutiveTarget(game, players, president)
@@ -490,20 +490,20 @@ func TestFullGameLoop_HitlerExecutedEndsGame(t *testing.T) {
 func TestFullGameLoop_Fuzz(t *testing.T) {
 	strategies := []struct {
 		name   string
-		choice func(step int, p *models.Player, seed uint64) secrethitler.VoteChoice
+		choice func(step int, p *models.Player, seed uint64) replicant.VoteChoice
 	}{
-		{"all_ja", func(int, *models.Player, uint64) secrethitler.VoteChoice { return secrethitler.VoteJa }},
-		{"alternate_fail_pass", func(step int, _ *models.Player, _ uint64) secrethitler.VoteChoice {
+		{"all_ja", func(int, *models.Player, uint64) replicant.VoteChoice { return replicant.VoteJa }},
+		{"alternate_fail_pass", func(step int, _ *models.Player, _ uint64) replicant.VoteChoice {
 			if step%3 == 0 {
-				return secrethitler.VoteNein
+				return replicant.VoteNein
 			}
-			return secrethitler.VoteJa
+			return replicant.VoteJa
 		}},
-		{"first_two_fail", func(step int, _ *models.Player, _ uint64) secrethitler.VoteChoice {
+		{"first_two_fail", func(step int, _ *models.Player, _ uint64) replicant.VoteChoice {
 			if step < 2 {
-				return secrethitler.VoteNein
+				return replicant.VoteNein
 			}
-			return secrethitler.VoteJa
+			return replicant.VoteJa
 		}},
 	}
 
@@ -520,10 +520,10 @@ func TestFullGameLoop_Fuzz(t *testing.T) {
 					if _, err := h.StartGame(context.Background(), g.GameID, "user-host"); err != nil {
 						t.Fatal(err)
 					}
-					final := playFullGameMixed(t, h, g.GameID, 1500, func(step int, p *models.Player) secrethitler.VoteChoice {
+					final := playFullGameMixed(t, h, g.GameID, 1500, func(step int, p *models.Player) replicant.VoteChoice {
 						return strat.choice(step, p, seed)
 					})
-					if final.Status != secrethitler.GameStatusCompleted {
+					if final.Status != replicant.GameStatusCompleted {
 						t.Fatalf("did not complete: %s", summarize(final))
 					}
 					if final.Winner == "" {
@@ -546,12 +546,12 @@ func TestFullGameLoop_ForcesTopDeck(t *testing.T) {
 	if _, err := h.StartGame(context.Background(), g.GameID, "user-host"); err != nil {
 		t.Fatal(err)
 	}
-	voteChoice := func(int, *models.Player) secrethitler.VoteChoice { return secrethitler.VoteNein }
+	voteChoice := func(int, *models.Player) replicant.VoteChoice { return replicant.VoteNein }
 	final := playFullGameMixed(t, h, g.GameID, 1000, voteChoice)
-	if final.Status != secrethitler.GameStatusCompleted {
+	if final.Status != replicant.GameStatusCompleted {
 		t.Fatalf("did not complete: %s", summarize(final))
 	}
-	topDecks := len(cap.envelopesOfType(string(secrethitler.EventTopDeckEnacted)))
+	topDecks := len(cap.envelopesOfType(string(replicant.EventTopDeckEnacted)))
 	if topDecks == 0 {
 		t.Error("expected at least one top-deck event")
 	}

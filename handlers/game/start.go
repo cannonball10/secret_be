@@ -8,7 +8,7 @@ import (
 
 	"github.com/cannonball10/foundation/models"
 	"github.com/cannonball10/foundation/schemas/database"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // CreateGame creates a new lobby hosted by the given user.
@@ -34,7 +34,7 @@ func (h *GameHandler) CreateGame(ctx context.Context, hostUserID, joinCode, host
 		return nil, nil, err
 	}
 
-	createdEvent := models.NewGameEvent(game.GameID, secrethitler.EventGameCreated, hostUserID)
+	createdEvent := models.NewGameEvent(game.GameID, replicant.EventGameCreated, hostUserID)
 	h.broadcast(ctx, createdEvent, GameCreatedPayload{JoinCode: joinCode, HostUserID: hostUserID})
 
 	// Board-only host: return early with a nil Player.
@@ -48,7 +48,7 @@ func (h *GameHandler) CreateGame(ctx context.Context, hostUserID, joinCode, host
 		return nil, nil, err
 	}
 
-	joinedEvent := models.NewGameEvent(game.GameID, secrethitler.EventPlayerJoined, host.PlayerID)
+	joinedEvent := models.NewGameEvent(game.GameID, replicant.EventPlayerJoined, host.PlayerID)
 	h.broadcast(ctx, joinedEvent, PlayerJoinedPayload{
 		PlayerID:    host.PlayerID,
 		DisplayName: host.DisplayName,
@@ -79,7 +79,7 @@ func (h *GameHandler) JoinGame(ctx context.Context, joinCode, userID, displayNam
 	if err != nil {
 		return nil, nil, err
 	}
-	if game.Status != secrethitler.GameStatusLobby {
+	if game.Status != replicant.GameStatusLobby {
 		return nil, nil, fmt.Errorf("%w: game is not accepting joins", ErrInvalidTransition)
 	}
 
@@ -94,10 +94,10 @@ func (h *GameHandler) JoinGame(ctx context.Context, joinCode, userID, displayNam
 	// to the package maximum so a single bad record can't strand a
 	// full-sized table.
 	maxP := game.Rules.MaxPlayers
-	if maxP <= 0 || maxP > secrethitler.PackageMaxPlayers {
+	if maxP <= 0 || maxP > replicant.PackageMaxPlayers {
 		slog.Warn("joinGame: Rules.MaxPlayers out of range, using package max",
 			"gameId", game.GameID, "stored", maxP)
-		maxP = secrethitler.PackageMaxPlayers
+		maxP = replicant.PackageMaxPlayers
 	}
 	if len(players) >= maxP {
 		slog.Info("joinGame: table full",
@@ -118,7 +118,7 @@ func (h *GameHandler) JoinGame(ctx context.Context, joinCode, userID, displayNam
 		return nil, nil, err
 	}
 
-	ev := models.NewGameEvent(game.GameID, secrethitler.EventPlayerJoined, player.PlayerID)
+	ev := models.NewGameEvent(game.GameID, replicant.EventPlayerJoined, player.PlayerID)
 	h.broadcast(ctx, ev, PlayerJoinedPayload{
 		PlayerID:    player.PlayerID,
 		DisplayName: player.DisplayName,
@@ -162,7 +162,7 @@ func (h *GameHandler) StartGame(ctx context.Context, gameID, hostUserID string) 
 	if game.HostUserID != hostUserID {
 		return nil, ErrNotHost
 	}
-	if game.Status != secrethitler.GameStatusLobby {
+	if game.Status != replicant.GameStatusLobby {
 		return nil, fmt.Errorf("%w: game already started", ErrInvalidTransition)
 	}
 
@@ -187,7 +187,7 @@ func (h *GameHandler) StartGame(ctx context.Context, gameID, hostUserID string) 
 	// same delegation in the same chair — useful for habitual groups
 	// that think of "Priya plays France" as part of the identity.
 	for _, p := range players {
-		country := secrethitler.CountryForSeat(p.Seat)
+		country := replicant.CountryForSeat(p.Seat)
 		p.CountryCode = country.Code
 		p.CountryName = country.Name
 	}
@@ -197,7 +197,7 @@ func (h *GameHandler) StartGame(ctx context.Context, gameID, hostUserID string) 
 
 	// Randomly pick the starting president from among the seats.
 	initialSeat := h.rng.IntN(len(players))
-	game.Status = secrethitler.GameStatusInProgress
+	game.Status = replicant.GameStatusInProgress
 	game.PresidentSeat = initialSeat
 	game.PlayerCount = len(players)
 	now := h.clock.Now()
@@ -206,14 +206,14 @@ func (h *GameHandler) StartGame(ctx context.Context, gameID, hostUserID string) 
 
 	// Broadcast start and move to nomination. setPhase handles the
 	// phase-changed emission and deadline.
-	started := models.NewGameEvent(gameID, secrethitler.EventGameStarted, hostUserID)
+	started := models.NewGameEvent(gameID, replicant.EventGameStarted, hostUserID)
 	h.broadcast(ctx, started, GameStartedPayload{
 		PlayerCount:          len(players),
 		InitialPresidentSeat: initialSeat,
 		Round:                game.Round,
 	})
 
-	h.setPhase(ctx, game, secrethitler.PhaseNomination, ReasonAction)
+	h.setPhase(ctx, game, replicant.PhaseNomination, ReasonAction)
 	if err := h.saveGame(ctx, game); err != nil {
 		return nil, err
 	}
@@ -238,18 +238,18 @@ func (h *GameHandler) dealRoles(ctx context.Context, game *models.Game, players 
 		return ErrNotEnoughPlayers
 	}
 
-	roles := make([]secrethitler.Role, 0, liberals+fascists+hitlers+singularities)
+	roles := make([]replicant.Role, 0, liberals+fascists+hitlers+singularities)
 	for i := 0; i < liberals; i++ {
-		roles = append(roles, secrethitler.RoleHuman)
+		roles = append(roles, replicant.RoleHuman)
 	}
 	for i := 0; i < fascists; i++ {
-		roles = append(roles, secrethitler.RoleAI)
+		roles = append(roles, replicant.RoleAI)
 	}
 	for i := 0; i < hitlers; i++ {
-		roles = append(roles, secrethitler.RoleRogue)
+		roles = append(roles, replicant.RoleRogue)
 	}
 	for i := 0; i < singularities; i++ {
-		roles = append(roles, secrethitler.RoleSingularity)
+		roles = append(roles, replicant.RoleSingularity)
 	}
 	h.rng.Shuffle(len(roles), func(i, j int) { roles[i], roles[j] = roles[j], roles[i] })
 
@@ -259,7 +259,7 @@ func (h *GameHandler) dealRoles(ctx context.Context, game *models.Game, players 
 
 	// Broadcast the "roles assigned" event so clients know to prompt
 	// each player for their private reveal.
-	h.broadcast(ctx, models.NewGameEvent(game.GameID, secrethitler.EventRolesAssigned, ""), nil)
+	h.broadcast(ctx, models.NewGameEvent(game.GameID, replicant.EventRolesAssigned, ""), nil)
 
 	// Whisper each player their private view. The reveal matrix:
 	//
@@ -271,14 +271,14 @@ func (h *GameHandler) dealRoles(ctx context.Context, game *models.Game, players 
 	for _, p := range players {
 		payload := RoleAssignedPayload{Role: p.Role, Party: p.Party}
 		switch p.Role {
-		case secrethitler.RoleAI:
+		case replicant.RoleAI:
 			payload.Teammates = cabalViewExcluding(players, p.PlayerID)
-		case secrethitler.RoleRogue:
+		case replicant.RoleRogue:
 			if len(players) <= 6 {
 				payload.Teammates = cabalViewExcluding(players, p.PlayerID)
 			}
 		}
-		ev := models.NewGameEvent(game.GameID, secrethitler.EventRolesAssigned, p.PlayerID)
+		ev := models.NewGameEvent(game.GameID, replicant.EventRolesAssigned, p.PlayerID)
 		h.whisper(ctx, ev, p.PlayerID, payload)
 	}
 	return nil
@@ -289,9 +289,9 @@ func (h *GameHandler) dealRoles(ctx context.Context, game *models.Game, players 
 // is always zero for the vanilla path.
 func rolesSeating(game *models.Game, playerCount int) (liberals, fascists, hitlers, singularities int, ok bool) {
 	if game.Rules.EnableSingularity {
-		return secrethitler.RoleDistributionWithSingularity(playerCount)
+		return replicant.RoleDistributionWithSingularity(playerCount)
 	}
-	l, f, h, ok := secrethitler.RoleDistribution(playerCount)
+	l, f, h, ok := replicant.RoleDistribution(playerCount)
 	return l, f, h, 0, ok
 }
 
@@ -303,7 +303,7 @@ func cabalViewExcluding(players []*models.Player, selfPlayerID string) []Teammat
 		if p.PlayerID == selfPlayerID {
 			continue
 		}
-		if p.Role == secrethitler.RoleAI || p.Role == secrethitler.RoleRogue {
+		if p.Role == replicant.RoleAI || p.Role == replicant.RoleRogue {
 			out = append(out, TeammateInfo{
 				PlayerID:    p.PlayerID,
 				DisplayName: p.DisplayName,

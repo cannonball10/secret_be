@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project summary
 
-This repo hosts a Go backend for **Secret Hitler** (the board game) plus a
+This repo hosts a Go backend for **Replicant** (the board game) plus a
 minimal React + TypeScript web client. The backend reuses the existing
 "foundation" connector pattern the repo was originally scaffolded around.
 
@@ -14,7 +14,7 @@ The backend implements a full rules-correct engine for 5-10 player
 games, streams state over Server-Sent Events, and exposes a Gin HTTP
 API. The web client is a dead-simple React shell that consumes both.
 
-Branch: `claude/secret-hitler-data-models-CiDqk`. All work has been
+Branch: `claude/replicant-data-models-CiDqk`. All work has been
 pushed to origin.
 
 ---
@@ -26,11 +26,11 @@ pushed to origin.
 # deps; scoped builds below are what you should use day-to-day.
 go build ./...
 
-# Build only the packages Secret Hitler actually uses (recommended):
-go build ./cmd/api ./api/... ./handlers/game/... ./models/... ./schemas/secrethitler/...
+# Build only the packages Replicant actually uses (recommended):
+go build ./cmd/api ./api/... ./handlers/game/... ./models/... ./schemas/replicant/...
 
 # Test the same:
-go test  ./api/... ./handlers/game/... ./models/... ./schemas/secrethitler/...
+go test  ./api/... ./handlers/game/... ./models/... ./schemas/replicant/...
 
 # Run the backend (see cmd/api/main.go):
 cp .env.example .env
@@ -49,10 +49,10 @@ npm run test         # node --test --experimental-strip-types
 
 ---
 
-## Repo layout (Secret Hitler-specific)
+## Repo layout (Replicant-specific)
 
 ```
-schemas/secrethitler/    — role/party/phase/event enums, role
+schemas/replicant/    — role/party/phase/event enums, role
                            distribution, power schedule (PowerFor).
 models/                  — Dynamo-backed entities: Game, Player,
                            Government, Vote, EnactedPolicy,
@@ -102,7 +102,7 @@ web/                     — React + TypeScript client (Vite).
 
 ---
 
-## Architecture notes (Secret Hitler-specific)
+## Architecture notes (Replicant-specific)
 
 ### Phase machine
 
@@ -156,7 +156,7 @@ forward envelopes.
 ## What's done (verified)
 
 - Data models and global registry; `go test ./models/...` green.
-- `schemas/secrethitler` enums + `PowerFor` + `RoleDistribution` +
+- `schemas/replicant` enums + `PowerFor` + `RoleDistribution` +
   `PartyFor` helpers.
 - Full game engine with
   - random initial president,
@@ -233,7 +233,7 @@ pop up):
    `connectors/connectors.go` wires every connector, `go build ./...`
    fails at the root. Options: `go get` the missing modules; or
    gate the livekit connector behind a build tag. Every package
-   Secret Hitler uses builds clean individually today.
+   Replicant uses builds clean individually today.
 
 7. **Redis-backed Hub**. For multi-instance deployment,
    implement `handlers/game/hub.go:Hub` on top of Redis pub-sub.
@@ -251,7 +251,7 @@ pop up):
 
 ## Commit / branch conventions
 
-- Single feature branch: `claude/secret-hitler-data-models-CiDqk`.
+- Single feature branch: `claude/replicant-data-models-CiDqk`.
 - Commit messages: imperative subject under ~70 chars, then wrapped
   body explaining *why* the change exists. Check `git log --oneline`
   for examples.

@@ -1,11 +1,11 @@
-// Enums — mirror schemas/secrethitler/secrethitler.go on the Go side.
+// Enums — mirror schemas/replicant/replicant.go on the Go side.
 //
 // Every literal lives in exactly one place (here) so adding a new
 // status value is one edit, not a manual sweep.
 
 import { z } from "zod";
 
-// Role vocabulary mirrors schemas/secrethitler/secrethitler.go. The
+// Role vocabulary mirrors schemas/replicant/replicant.go. The
 // "ai"/"rogue" tokens remain for wire compatibility; in-fiction the
 // Replicant theme presents them as Replicant / Prime. "singularity"
 // is the solo kingmaker faction, dealt only when the server's

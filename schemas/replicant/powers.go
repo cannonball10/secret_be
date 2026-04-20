@@ -1,4 +1,4 @@
-package secrethitler
+package replicant
 
 // PowerFor returns the executive action triggered when the Nth fascist
 // policy is enacted, or "" if no power is triggered. N is 1-indexed.

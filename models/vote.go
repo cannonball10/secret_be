@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // VoteKeys provides key construction for the Vote model.
@@ -18,7 +18,7 @@ type Vote struct {
 	GameID       string                  `json:"gameId"`
 	GovernmentID string                  `json:"governmentId"`
 	PlayerID     string                  `json:"playerId"`
-	Choice       secrethitler.VoteChoice `json:"choice"`
+	Choice       replicant.VoteChoice `json:"choice"`
 }
 
 // voteSK builds the composite sort key "VOTE#{governmentId}#{playerId}".
@@ -27,7 +27,7 @@ func voteSK(governmentID, playerID string) string {
 }
 
 // NewVote creates a new Vote for the given player on a government.
-func NewVote(gameID, governmentID, playerID string, choice secrethitler.VoteChoice) *Vote {
+func NewVote(gameID, governmentID, playerID string, choice replicant.VoteChoice) *Vote {
 	return &Vote{
 		Timestamps:   NewTimestamps(),
 		GameID:       gameID,
@@ -43,7 +43,7 @@ func (v *Vote) SK() string { return voteSK(v.GovernmentID, v.PlayerID) }
 func (v *Vote) GSIs() map[int]GSIKeyPair { return nil }
 
 // IsJa is a convenience for vote counting.
-func (v *Vote) IsJa() bool { return v.Choice == secrethitler.VoteJa }
+func (v *Vote) IsJa() bool { return v.Choice == replicant.VoteJa }
 
 func init() {
 	RegisterModel(VoteKeys, func() Model { return &Vote{} })

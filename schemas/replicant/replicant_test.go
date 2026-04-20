@@ -1,4 +1,4 @@
-package secrethitler
+package replicant
 
 import "testing"
 

@@ -8,7 +8,7 @@ import (
 	"github.com/cannonball10/foundation/handlers/narrator"
 	"github.com/cannonball10/foundation/models"
 	audioschema "github.com/cannonball10/foundation/schemas/audio"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // fakeNarrator is a deterministic CableNarrator for tests. RankCables
@@ -72,7 +72,7 @@ func TestCablePhase_DisabledDefault(t *testing.T) {
 	}
 
 	after, _ := h.loadGame(ctx, g.GameID)
-	if after.Phase != secrethitler.PhaseElection {
+	if after.Phase != replicant.PhaseElection {
 		t.Errorf("expected PhaseElection after nomination with cable disabled, got %s", after.Phase)
 	}
 }
@@ -85,7 +85,7 @@ func TestCablePhase_EveryRound_Opens(t *testing.T) {
 	ctx := context.Background()
 	h, _, cap, clock := newTestHandler(t, 103)
 	g := seedLobby(t, h, 7)
-	g.Rules.CablePhaseMode = secrethitler.CableModeEveryRound
+	g.Rules.CablePhaseMode = replicant.CableModeEveryRound
 	g.Rules.CablePhaseDurationSec = 30
 	if err := h.saveGame(ctx, g); err != nil {
 		t.Fatalf("saveGame: %v", err)
@@ -104,7 +104,7 @@ func TestCablePhase_EveryRound_Opens(t *testing.T) {
 	}
 
 	after, _ := h.loadGame(ctx, g.GameID)
-	if after.Phase != secrethitler.PhaseCablePhase {
+	if after.Phase != replicant.PhaseCablePhase {
 		t.Errorf("expected PhaseCablePhase after nomination with cable on, got %s", after.Phase)
 	}
 	if after.PhaseDeadline == nil {
@@ -114,9 +114,9 @@ func TestCablePhase_EveryRound_Opens(t *testing.T) {
 	if !after.PhaseDeadline.Equal(expectedDeadline) {
 		t.Errorf("deadline = %v, want %v", after.PhaseDeadline, expectedDeadline)
 	}
-	if len(cap.envelopesOfType(string(secrethitler.EventCablePhaseOpened))) != 1 {
+	if len(cap.envelopesOfType(string(replicant.EventCablePhaseOpened))) != 1 {
 		t.Errorf("expected 1 cable_phase_opened event, got %d",
-			len(cap.envelopesOfType(string(secrethitler.EventCablePhaseOpened))))
+			len(cap.envelopesOfType(string(replicant.EventCablePhaseOpened))))
 	}
 }
 
@@ -127,7 +127,7 @@ func TestCablePhase_TimerExpired_Closes(t *testing.T) {
 	ctx := context.Background()
 	h, _, cap, clock := newTestHandler(t, 107)
 	g := seedLobby(t, h, 7)
-	g.Rules.CablePhaseMode = secrethitler.CableModeEveryRound
+	g.Rules.CablePhaseMode = replicant.CableModeEveryRound
 	g.Rules.CablePhaseDurationSec = 15
 	if err := h.saveGame(ctx, g); err != nil {
 		t.Fatalf("saveGame: %v", err)
@@ -152,10 +152,10 @@ func TestCablePhase_TimerExpired_Closes(t *testing.T) {
 	}
 
 	after, _ := h.loadGame(ctx, g.GameID)
-	if after.Phase != secrethitler.PhaseElection {
+	if after.Phase != replicant.PhaseElection {
 		t.Errorf("expected PhaseElection after cable timeout, got %s", after.Phase)
 	}
-	closedEvents := cap.envelopesOfType(string(secrethitler.EventCablePhaseClosed))
+	closedEvents := cap.envelopesOfType(string(replicant.EventCablePhaseClosed))
 	if len(closedEvents) != 1 {
 		t.Fatalf("expected 1 cable_phase_closed event, got %d", len(closedEvents))
 	}
@@ -169,7 +169,7 @@ func TestCablePhase_Submission_PersistsAndAcks(t *testing.T) {
 	ctx := context.Background()
 	h, db, cap, _ := newTestHandler(t, 131)
 	g := seedLobby(t, h, 7)
-	g.Rules.CablePhaseMode = secrethitler.CableModeEveryRound
+	g.Rules.CablePhaseMode = replicant.CableModeEveryRound
 	g.Rules.CablePhaseDurationSec = 60
 	if err := h.saveGame(ctx, g); err != nil {
 		t.Fatalf("saveGame: %v", err)
@@ -193,11 +193,11 @@ func TestCablePhase_Submission_PersistsAndAcks(t *testing.T) {
 
 	// Cable Phase is now open. A submission should persist + ack.
 	sender := players[0]
-	before := len(cap.envelopesOfType(string(secrethitler.EventChatMessage)))
+	before := len(cap.envelopesOfType(string(replicant.EventChatMessage)))
 	if err := h.SendChat(ctx, g.GameID, sender.PlayerID, ChannelCable, "I move that we adjourn."); err != nil {
 		t.Fatalf("SendChat(cable): %v", err)
 	}
-	after := cap.envelopesOfType(string(secrethitler.EventChatMessage))
+	after := cap.envelopesOfType(string(replicant.EventChatMessage))
 	if len(after)-before != 1 {
 		t.Fatalf("expected 1 new chat_message envelope, got %d", len(after)-before)
 	}
@@ -251,7 +251,7 @@ func TestCablePhase_LeakFlow_PicksTopCable(t *testing.T) {
 	)
 
 	g := seedLobby(t, h, 7)
-	g.Rules.CablePhaseMode = secrethitler.CableModeEveryRound
+	g.Rules.CablePhaseMode = replicant.CableModeEveryRound
 	g.Rules.CablePhaseDurationSec = 60
 	g.Rules.CableLeakSilenceChance = 0 // force a leak
 	if err := h.saveGame(ctx, g); err != nil {
@@ -286,7 +286,7 @@ func TestCablePhase_LeakFlow_PicksTopCable(t *testing.T) {
 	}
 
 	// Exactly one cable_leaked envelope, naming the high-scored body.
-	leaks := cap.envelopesOfType(string(secrethitler.EventCableLeaked))
+	leaks := cap.envelopesOfType(string(replicant.EventCableLeaked))
 	if len(leaks) != 1 {
 		t.Fatalf("expected 1 cable_leaked, got %d", len(leaks))
 	}
@@ -348,7 +348,7 @@ func TestCablePhase_LeakFlow_SilenceFallback(t *testing.T) {
 	)
 
 	g := seedLobby(t, h, 7)
-	g.Rules.CablePhaseMode = secrethitler.CableModeEveryRound
+	g.Rules.CablePhaseMode = replicant.CableModeEveryRound
 	g.Rules.CablePhaseDurationSec = 60
 	g.Rules.CableLeakSilenceChance = 1.0 // force silence
 	if err := h.saveGame(ctx, g); err != nil {
@@ -372,7 +372,7 @@ func TestCablePhase_LeakFlow_SilenceFallback(t *testing.T) {
 		t.Fatalf("TimerExpired: %v", err)
 	}
 
-	leaks := cap.envelopesOfType(string(secrethitler.EventCableLeaked))
+	leaks := cap.envelopesOfType(string(replicant.EventCableLeaked))
 	if len(leaks) != 1 {
 		t.Fatalf("expected 1 cable_leaked on silence path, got %d", len(leaks))
 	}
@@ -413,7 +413,7 @@ func TestCablePhase_LeakFlow_NoSubmissions(t *testing.T) {
 		WithCableNarrator(f),
 	)
 	g := seedLobby(t, h, 7)
-	g.Rules.CablePhaseMode = secrethitler.CableModeEveryRound
+	g.Rules.CablePhaseMode = replicant.CableModeEveryRound
 	g.Rules.CablePhaseDurationSec = 60
 	if err := h.saveGame(ctx, g); err != nil {
 		t.Fatalf("saveGame: %v", err)
@@ -432,7 +432,7 @@ func TestCablePhase_LeakFlow_NoSubmissions(t *testing.T) {
 	if err := h.TimerExpired(ctx, g.GameID); err != nil {
 		t.Fatalf("TimerExpired: %v", err)
 	}
-	if got := len(cap.envelopesOfType(string(secrethitler.EventCableLeaked))); got != 0 {
+	if got := len(cap.envelopesOfType(string(replicant.EventCableLeaked))); got != 0 {
 		t.Errorf("expected 0 cable_leaked events with no submissions, got %d", got)
 	}
 	if f.calls != 0 {
@@ -447,7 +447,7 @@ func TestCablePhase_ForceProgress_Closes(t *testing.T) {
 	ctx := context.Background()
 	h, _, _, _ := newTestHandler(t, 109)
 	g := seedLobby(t, h, 7)
-	g.Rules.CablePhaseMode = secrethitler.CableModeEveryRound
+	g.Rules.CablePhaseMode = replicant.CableModeEveryRound
 	g.Rules.CablePhaseDurationSec = 60
 	if err := h.saveGame(ctx, g); err != nil {
 		t.Fatalf("saveGame: %v", err)
@@ -466,7 +466,7 @@ func TestCablePhase_ForceProgress_Closes(t *testing.T) {
 		t.Fatalf("ForceProgress: %v", err)
 	}
 	after, _ := h.loadGame(ctx, g.GameID)
-	if after.Phase != secrethitler.PhaseElection {
+	if after.Phase != replicant.PhaseElection {
 		t.Errorf("expected PhaseElection after force-progress, got %s", after.Phase)
 	}
 }

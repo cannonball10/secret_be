@@ -22,7 +22,7 @@ type RNG interface {
 }
 
 // CryptoRNG is a crypto/rand-backed RNG suitable for production. For
-// Secret Hitler randomness determines secret information (roles, policy
+// Replicant randomness determines secret information (roles, policy
 // order) so a CSPRNG is the right default.
 type CryptoRNG struct{}
 

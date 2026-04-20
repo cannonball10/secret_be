@@ -3,11 +3,11 @@ package models
 import (
 	"testing"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 func TestNewVote(t *testing.T) {
-	v := NewVote("g", "gov", "p", secrethitler.VoteJa)
+	v := NewVote("g", "gov", "p", replicant.VoteJa)
 	if v.GameID != "g" || v.GovernmentID != "gov" || v.PlayerID != "p" {
 		t.Errorf("fields = %+v", v)
 	}
@@ -17,7 +17,7 @@ func TestNewVote(t *testing.T) {
 }
 
 func TestVoteKeys(t *testing.T) {
-	v := NewVote("G1", "GOV1", "P1", secrethitler.VoteNein)
+	v := NewVote("G1", "GOV1", "P1", replicant.VoteNein)
 
 	if v.PK() != "GAME#G1" {
 		t.Errorf("PK() = %q", v.PK())

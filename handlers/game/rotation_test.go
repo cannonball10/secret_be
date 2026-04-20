@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // TestTopDeckDoesNotDoubleRotate forces a top-deck scenario and verifies
@@ -25,7 +25,7 @@ func TestTopDeckDoesNotDoubleRotate(t *testing.T) {
 	// Fail three elections to force a top-deck.
 	for i := 0; i < 3; i++ {
 		game, _ := h.loadGame(ctx, g.GameID)
-		if game.Phase != secrethitler.PhaseNomination {
+		if game.Phase != replicant.PhaseNomination {
 			t.Fatalf("iter %d: want nomination, got %s", i, game.Phase)
 		}
 		president := findPlayerBySeat(players, game.PresidentSeat)
@@ -34,16 +34,16 @@ func TestTopDeckDoesNotDoubleRotate(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, p := range players {
-			_ = h.CastVote(ctx, g.GameID, p.PlayerID, secrethitler.VoteNein)
+			_ = h.CastVote(ctx, g.GameID, p.PlayerID, replicant.VoteNein)
 			g2, _ := h.loadGame(ctx, g.GameID)
-			if g2.Phase != secrethitler.PhaseElection {
+			if g2.Phase != replicant.PhaseElection {
 				break
 			}
 		}
 	}
 
 	after, _ := h.loadGame(ctx, g.GameID)
-	if after.Status == secrethitler.GameStatusCompleted {
+	if after.Status == replicant.GameStatusCompleted {
 		t.Skip("topdeck ended the game; re-run with a seed that doesn't")
 	}
 	// Per rulebook: tracker reaches 3 → top-deck enacts → tracker

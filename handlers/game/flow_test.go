@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // findAnyEligibleChancellor returns an alive player who is not the
@@ -51,14 +51,14 @@ func TestFullRound_LiberalPolicyEnacted(t *testing.T) {
 	}
 	// Force an Election pass: everyone votes ja.
 	for _, p := range players {
-		if err := h.CastVote(ctx, g.GameID, p.PlayerID, secrethitler.VoteJa); err != nil {
+		if err := h.CastVote(ctx, g.GameID, p.PlayerID, replicant.VoteJa); err != nil {
 			t.Fatalf("CastVote: %v", err)
 		}
 	}
 
 	// Now in legislative_president; discard the first policy.
 	gFresh, _ := h.loadGame(ctx, g.GameID)
-	if gFresh.Phase != secrethitler.PhaseLegislativePresident {
+	if gFresh.Phase != replicant.PhaseLegislativePresident {
 		t.Fatalf("want legislative_president, got %s", gFresh.Phase)
 	}
 	if err := h.PresidentDiscard(ctx, g.GameID, president.PlayerID, 0); err != nil {
@@ -67,7 +67,7 @@ func TestFullRound_LiberalPolicyEnacted(t *testing.T) {
 
 	// Now in legislative_chancellor.
 	gFresh, _ = h.loadGame(ctx, g.GameID)
-	if gFresh.Phase != secrethitler.PhaseLegislativeChancellor {
+	if gFresh.Phase != replicant.PhaseLegislativeChancellor {
 		t.Fatalf("want legislative_chancellor, got %s", gFresh.Phase)
 	}
 	gov, _ := h.loadGovernment(ctx, g.GameID, gFresh.CurrentGovernmentID)
@@ -75,7 +75,7 @@ func TestFullRound_LiberalPolicyEnacted(t *testing.T) {
 	// Pick a liberal option if available so we don't trigger a power.
 	enactIdx := 0
 	for i, p := range gov.ChancellorOptions {
-		if p == secrethitler.PolicyHuman {
+		if p == replicant.PolicyHuman {
 			enactIdx = i
 			break
 		}
@@ -90,7 +90,7 @@ func TestFullRound_LiberalPolicyEnacted(t *testing.T) {
 	// If we got forced to enact fascist (no liberal in hand) the phase
 	// might be ExecutiveAction on some player counts; for 5p, first
 	// fascist triggers no power so phase is still Nomination.
-	if gFinal.Phase != secrethitler.PhaseNomination {
+	if gFinal.Phase != replicant.PhaseNomination {
 		t.Errorf("want nomination after enact, got %s (enacted=%s)", gFinal.Phase, enactedType)
 	}
 	if gFinal.Round <= startRound {
@@ -115,7 +115,7 @@ func TestElectionTracker_FailedThreeInARowTopDecks(t *testing.T) {
 	_ = started
 	for i := 0; i < 3; i++ {
 		gFresh, _ := h.loadGame(ctx, g.GameID)
-		if gFresh.Phase != secrethitler.PhaseNomination {
+		if gFresh.Phase != replicant.PhaseNomination {
 			t.Fatalf("iteration %d: want nomination, got %s", i, gFresh.Phase)
 		}
 		if err := h.ForceProgress(ctx, g.GameID, "user-host"); err != nil {
@@ -125,7 +125,7 @@ func TestElectionTracker_FailedThreeInARowTopDecks(t *testing.T) {
 	// After 3 failed nominations the election tracker triggers a topdeck.
 	// If the forced policy was liberal/fascist we just check that a
 	// TopDeck event was emitted.
-	tops := cap.envelopesOfType(string(secrethitler.EventTopDeckEnacted))
+	tops := cap.envelopesOfType(string(replicant.EventTopDeckEnacted))
 	if len(tops) == 0 {
 		t.Error("expected a TopDeckEnacted event")
 	}

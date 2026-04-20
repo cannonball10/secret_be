@@ -14,7 +14,7 @@ import (
 	"github.com/cannonball10/foundation/handlers/game"
 	"github.com/cannonball10/foundation/models"
 	"github.com/cannonball10/foundation/schemas/database"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -386,6 +386,6 @@ func seedFivePlayerInProgress(t *testing.T, s *Server) string {
 	if w.Code != http.StatusOK {
 		t.Fatalf("start: %d, body=%s", w.Code, w.Body.String())
 	}
-	_ = secrethitler.GameStatusInProgress
+	_ = replicant.GameStatusInProgress
 	return created.Game.GameID
 }

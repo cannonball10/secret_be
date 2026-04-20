@@ -1,4 +1,4 @@
-// Mirror of schemas/secrethitler/countries.go. The backend assigns
+// Mirror of schemas/replicant/countries.go. The backend assigns
 // each seat a Country at StartGame — but the lobby wants to show the
 // per-seat flag *before* assignment happens (so incoming players see
 // "seat 3 will play as France"). Duplicating the table here keeps the

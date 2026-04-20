@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // PresidentDiscard is invoked by the current president to discard one
@@ -16,7 +16,7 @@ func (h *GameHandler) PresidentDiscard(ctx context.Context, gameID, presidentPla
 	if err != nil {
 		return err
 	}
-	if err := mustPhase(game, secrethitler.PhaseLegislativePresident); err != nil {
+	if err := mustPhase(game, replicant.PhaseLegislativePresident); err != nil {
 		return err
 	}
 	players, err := h.loadPlayers(ctx, gameID)
@@ -40,7 +40,7 @@ func (h *GameHandler) PresidentDiscard(ctx context.Context, gameID, presidentPla
 	}
 
 	discarded := gov.DrawnPolicies[discardIndex]
-	remaining := make([]secrethitler.PolicyType, 0, 2)
+	remaining := make([]replicant.PolicyType, 0, 2)
 	for i, p := range gov.DrawnPolicies {
 		if i == discardIndex {
 			continue
@@ -56,20 +56,20 @@ func (h *GameHandler) PresidentDiscard(ctx context.Context, gameID, presidentPla
 	}
 
 	// Broadcast discard count (no card identity).
-	pubEv := models.NewGameEvent(gameID, secrethitler.EventPresidentDiscarded, president.PlayerID)
+	pubEv := models.NewGameEvent(gameID, replicant.EventPresidentDiscarded, president.PlayerID)
 	h.broadcast(ctx, pubEv, PresidentDiscardedPayload{GovernmentID: gov.GovernmentID})
 
 	// Whisper remaining policies to the chancellor.
 	chancellor := findPlayerBySeat(players, *gov.ChancellorSeat)
 	if chancellor != nil {
-		whisperEv := models.NewGameEvent(gameID, secrethitler.EventPresidentDiscarded, chancellor.PlayerID)
+		whisperEv := models.NewGameEvent(gameID, replicant.EventPresidentDiscarded, chancellor.PlayerID)
 		h.whisper(ctx, whisperEv, chancellor.PlayerID, PresidentDiscardedPayload{
 			GovernmentID: gov.GovernmentID,
 			Options:      remaining,
 		})
 	}
 
-	h.setPhase(ctx, game, secrethitler.PhaseLegislativeChancellor, ReasonAction)
+	h.setPhase(ctx, game, replicant.PhaseLegislativeChancellor, ReasonAction)
 	return h.saveGame(ctx, game)
 }
 
@@ -81,7 +81,7 @@ func (h *GameHandler) ChancellorEnact(ctx context.Context, gameID, chancellorPla
 	if err != nil {
 		return err
 	}
-	if err := mustPhase(game, secrethitler.PhaseLegislativeChancellor); err != nil {
+	if err := mustPhase(game, replicant.PhaseLegislativeChancellor); err != nil {
 		return err
 	}
 	players, err := h.loadPlayers(ctx, gameID)
@@ -122,8 +122,8 @@ func (h *GameHandler) ChancellorEnact(ctx context.Context, gameID, chancellorPla
 // applyEnactedPolicy increments the board counters, writes an
 // EnactedPolicy record, emits events, and decides the next phase.
 // topDeck=true signals this enactment came from the election tracker.
-func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game, gov *models.Government, players []*models.Player, policy secrethitler.PolicyType, topDeck bool) error {
-	if policy == secrethitler.PolicyHuman {
+func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game, gov *models.Government, players []*models.Player, policy replicant.PolicyType, topDeck bool) error {
+	if policy == replicant.PolicyHuman {
 		game.HumanPoliciesEnacted++
 	} else {
 		game.AIPoliciesEnacted++
@@ -146,7 +146,7 @@ func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game,
 	}
 
 	if topDeck {
-		ev := models.NewGameEvent(game.GameID, secrethitler.EventTopDeckEnacted, "")
+		ev := models.NewGameEvent(game.GameID, replicant.EventTopDeckEnacted, "")
 		h.broadcast(ctx, ev, TopDeckPayload{
 			Policy:                 policy,
 			HumanPoliciesEnacted: game.HumanPoliciesEnacted,
@@ -159,7 +159,7 @@ func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game,
 				actor = chancellor.PlayerID
 			}
 		}
-		ev := models.NewGameEvent(game.GameID, secrethitler.EventChancellorEnacted, actor)
+		ev := models.NewGameEvent(game.GameID, replicant.EventChancellorEnacted, actor)
 		h.broadcast(ctx, ev, ChancellorEnactedPayload{
 			GovernmentID:           governmentID,
 			Policy:                 policy,
@@ -170,10 +170,10 @@ func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game,
 
 	// Check policy-based win conditions.
 	if game.HumanPoliciesEnacted >= game.Rules.HumanPoliciesToWin {
-		return h.endGame(ctx, game, secrethitler.PartyHuman, secrethitler.WinHumanPolicies)
+		return h.endGame(ctx, game, replicant.PartyHuman, replicant.WinHumanPolicies)
 	}
 	if game.AIPoliciesEnacted >= game.Rules.AIPoliciesToWin {
-		return h.endGame(ctx, game, secrethitler.PartyAI, secrethitler.WinAIPolicies)
+		return h.endGame(ctx, game, replicant.PartyAI, replicant.WinAIPolicies)
 	}
 
 	// Record term limits after a successful, non-topdeck enactment.
@@ -185,8 +185,8 @@ func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game,
 	}
 
 	// If a fascist policy was enacted (non-topdeck), check for a power.
-	if !topDeck && policy == secrethitler.PolicyAI {
-		power := secrethitler.PowerFor(game.PlayerCount, game.AIPoliciesEnacted)
+	if !topDeck && policy == replicant.PolicyAI {
+		power := replicant.PowerFor(game.PlayerCount, game.AIPoliciesEnacted)
 		if power != "" {
 			return h.enterExecutiveAction(ctx, game, gov, power)
 		}
@@ -194,7 +194,7 @@ func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game,
 
 	// Otherwise rotate to the next round.
 	h.rotatePresident(game, players)
-	h.setPhase(ctx, game, secrethitler.PhaseNomination, ReasonAction)
+	h.setPhase(ctx, game, replicant.PhaseNomination, ReasonAction)
 	return h.saveGame(ctx, game)
 }
 
@@ -221,7 +221,7 @@ func (h *GameHandler) ProposeVeto(ctx context.Context, gameID, chancellorPlayerI
 	if err != nil {
 		return err
 	}
-	if err := mustPhase(game, secrethitler.PhaseLegislativeChancellor); err != nil {
+	if err := mustPhase(game, replicant.PhaseLegislativeChancellor); err != nil {
 		return err
 	}
 	if !game.VetoUnlocked {
@@ -248,10 +248,10 @@ func (h *GameHandler) ProposeVeto(ctx context.Context, gameID, chancellorPlayerI
 		return err
 	}
 
-	ev := models.NewGameEvent(gameID, secrethitler.EventVetoProposed, chancellorPlayerID)
+	ev := models.NewGameEvent(gameID, replicant.EventVetoProposed, chancellorPlayerID)
 	h.broadcast(ctx, ev, VetoProposedPayload{GovernmentID: gov.GovernmentID})
 
-	h.setPhase(ctx, game, secrethitler.PhaseVetoRequested, ReasonAction)
+	h.setPhase(ctx, game, replicant.PhaseVetoRequested, ReasonAction)
 	return h.saveGame(ctx, game)
 }
 
@@ -265,7 +265,7 @@ func (h *GameHandler) ResolveVeto(ctx context.Context, gameID, presidentPlayerID
 	if err != nil {
 		return err
 	}
-	if err := mustPhase(game, secrethitler.PhaseVetoRequested); err != nil {
+	if err := mustPhase(game, replicant.PhaseVetoRequested); err != nil {
 		return err
 	}
 	players, err := h.loadPlayers(ctx, gameID)
@@ -286,7 +286,7 @@ func (h *GameHandler) ResolveVeto(ctx context.Context, gameID, presidentPlayerID
 		return err
 	}
 
-	ev := models.NewGameEvent(gameID, secrethitler.EventVetoResolved, presidentPlayerID)
+	ev := models.NewGameEvent(gameID, replicant.EventVetoResolved, presidentPlayerID)
 	h.broadcast(ctx, ev, VetoResolvedPayload{GovernmentID: gov.GovernmentID, Accepted: accepted})
 
 	if accepted {
@@ -298,6 +298,6 @@ func (h *GameHandler) ResolveVeto(ctx context.Context, gameID, presidentPlayerID
 		return err
 	}
 	// Rejected: chancellor must now enact. Return to the chancellor phase.
-	h.setPhase(ctx, game, secrethitler.PhaseLegislativeChancellor, ReasonAction)
+	h.setPhase(ctx, game, replicant.PhaseLegislativeChancellor, ReasonAction)
 	return h.saveGame(ctx, game)
 }

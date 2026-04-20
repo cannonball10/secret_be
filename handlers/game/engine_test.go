@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 func mustParseTime(s string) time.Time {
@@ -54,8 +54,8 @@ func TestCreateGame_EmitsCreatedAndJoined(t *testing.T) {
 
 	types := cap.typesEmitted()
 	if len(types) < 2 ||
-		types[0] != string(secrethitler.EventGameCreated) ||
-		types[1] != string(secrethitler.EventPlayerJoined) {
+		types[0] != string(replicant.EventGameCreated) ||
+		types[1] != string(replicant.EventPlayerJoined) {
 		t.Errorf("want [game_created, player_joined, ...]; got %v", types)
 	}
 }
@@ -87,10 +87,10 @@ func TestStartGame_RandomPresidentAndRoleDeal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StartGame: %v", err)
 	}
-	if got.Status != secrethitler.GameStatusInProgress {
+	if got.Status != replicant.GameStatusInProgress {
 		t.Errorf("Status = %s", got.Status)
 	}
-	if got.Phase != secrethitler.PhaseNomination {
+	if got.Phase != replicant.PhaseNomination {
 		t.Errorf("Phase = %s", got.Phase)
 	}
 	if got.PresidentSeat < 0 || got.PresidentSeat >= len(players) {
@@ -99,7 +99,7 @@ func TestStartGame_RandomPresidentAndRoleDeal(t *testing.T) {
 	if got.PlayerCount != 5 {
 		t.Errorf("PlayerCount = %d", got.PlayerCount)
 	}
-	if len(got.DrawPile) != secrethitler.LiberalPoliciesInDeck+secrethitler.FascistPoliciesInDeck {
+	if len(got.DrawPile) != replicant.LiberalPoliciesInDeck+replicant.FascistPoliciesInDeck {
 		t.Errorf("DrawPile size = %d", len(got.DrawPile))
 	}
 
@@ -108,11 +108,11 @@ func TestStartGame_RandomPresidentAndRoleDeal(t *testing.T) {
 	libs, fascs, hits := 0, 0, 0
 	for _, p := range fresh {
 		switch p.Role {
-		case secrethitler.RoleHuman:
+		case replicant.RoleHuman:
 			libs++
-		case secrethitler.RoleAI:
+		case replicant.RoleAI:
 			fascs++
-		case secrethitler.RoleRogue:
+		case replicant.RoleRogue:
 			hits++
 		}
 	}
@@ -121,7 +121,7 @@ func TestStartGame_RandomPresidentAndRoleDeal(t *testing.T) {
 	}
 
 	// Every player gets a whispered role event.
-	roles := cap.envelopesOfType(string(secrethitler.EventRolesAssigned))
+	roles := cap.envelopesOfType(string(replicant.EventRolesAssigned))
 	privates := 0
 	for _, e := range roles {
 		if e.Audience.Scope == AudiencePlayer {
@@ -172,13 +172,13 @@ func TestCastVote_AllVotedResolvesElection(t *testing.T) {
 
 	// Everyone votes Ja.
 	for _, p := range players {
-		if err := h.CastVote(ctx, g.GameID, p.PlayerID, secrethitler.VoteJa); err != nil {
+		if err := h.CastVote(ctx, g.GameID, p.PlayerID, replicant.VoteJa); err != nil {
 			t.Fatalf("CastVote for %s: %v", p.PlayerID, err)
 		}
 	}
 
 	// Election should have resolved: ReasonAllVoted.
-	results := cap.envelopesOfType(string(secrethitler.EventElectionResult))
+	results := cap.envelopesOfType(string(replicant.EventElectionResult))
 	if len(results) == 0 {
 		t.Fatal("expected election-result emission")
 	}
@@ -193,7 +193,7 @@ func TestCastVote_AllVotedResolvesElection(t *testing.T) {
 	}
 
 	post, _ := h.loadGame(ctx, g.GameID)
-	if post.Phase != secrethitler.PhaseLegislativePresident {
+	if post.Phase != replicant.PhaseLegislativePresident {
 		t.Errorf("post-election phase = %s, want legislative_president", post.Phase)
 	}
 }
@@ -209,10 +209,10 @@ func TestCastVote_RejectsDoubleVote(t *testing.T) {
 	chancellor := findFirstOther(players, president.PlayerID)
 	_, _ = h.NominateChancellor(ctx, g.GameID, president.PlayerID, chancellor.PlayerID)
 
-	if err := h.CastVote(ctx, g.GameID, players[0].PlayerID, secrethitler.VoteJa); err != nil {
+	if err := h.CastVote(ctx, g.GameID, players[0].PlayerID, replicant.VoteJa); err != nil {
 		t.Fatal(err)
 	}
-	err := h.CastVote(ctx, g.GameID, players[0].PlayerID, secrethitler.VoteNein)
+	err := h.CastVote(ctx, g.GameID, players[0].PlayerID, replicant.VoteNein)
 	if !errors.Is(err, ErrAlreadyVoted) {
 		t.Errorf("want ErrAlreadyVoted, got %v", err)
 	}
@@ -229,8 +229,8 @@ func TestForceProgress_AsHostAdvancesElection(t *testing.T) {
 	_, _ = h.NominateChancellor(ctx, g.GameID, president.PlayerID, chancellor.PlayerID)
 
 	// Only two players vote (ja).
-	_ = h.CastVote(ctx, g.GameID, players[0].PlayerID, secrethitler.VoteJa)
-	_ = h.CastVote(ctx, g.GameID, players[1].PlayerID, secrethitler.VoteJa)
+	_ = h.CastVote(ctx, g.GameID, players[0].PlayerID, replicant.VoteJa)
+	_ = h.CastVote(ctx, g.GameID, players[1].PlayerID, replicant.VoteJa)
 
 	// Host forces progress while phase is still Election.
 	if err := h.ForceProgress(ctx, g.GameID, "user-host"); err != nil {
@@ -238,7 +238,7 @@ func TestForceProgress_AsHostAdvancesElection(t *testing.T) {
 	}
 
 	// Expect an ElectionResult with ReasonForced.
-	results := cap.envelopesOfType(string(secrethitler.EventElectionResult))
+	results := cap.envelopesOfType(string(replicant.EventElectionResult))
 	found := false
 	for _, env := range results {
 		if p, ok := env.Payload.(ElectionResultPayload); ok && p.Reason == ReasonForced {
@@ -284,7 +284,7 @@ func TestTimerExpired_AdvancesAfterDeadline(t *testing.T) {
 		t.Fatalf("TimerExpired: %v", err)
 	}
 	found := false
-	for _, env := range cap.envelopesOfType(string(secrethitler.EventElectionResult)) {
+	for _, env := range cap.envelopesOfType(string(replicant.EventElectionResult)) {
 		if p, ok := env.Payload.(ElectionResultPayload); ok && p.Reason == ReasonTimeout {
 			found = true
 		}

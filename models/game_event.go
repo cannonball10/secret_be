@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 	"github.com/cannonball10/foundation/utils"
 )
 
@@ -18,7 +18,7 @@ type GameEvent struct {
 
 	EventID string                 `json:"eventId"`
 	GameID  string                 `json:"gameId"`
-	Type    secrethitler.EventType `json:"type"`
+	Type    replicant.EventType `json:"type"`
 	// ActorPlayerID is the player who caused this event (president,
 	// voter, chancellor, etc). Empty for system events.
 	ActorPlayerID string `json:"actorPlayerId,omitempty"`
@@ -30,7 +30,7 @@ type GameEvent struct {
 }
 
 // NewGameEvent creates a GameEvent with an auto-generated ULID.
-func NewGameEvent(gameID string, eventType secrethitler.EventType, actorPlayerID string) *GameEvent {
+func NewGameEvent(gameID string, eventType replicant.EventType, actorPlayerID string) *GameEvent {
 	return &GameEvent{
 		Timestamps:    NewTimestamps(),
 		EventID:       utils.GenerateULID(),

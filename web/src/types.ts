@@ -1,5 +1,5 @@
 // Types mirror the backend OpenAPI spec (docs/openapi.yaml). Keep this
-// file in sync with schemas/secrethitler and handlers/game/events.go.
+// file in sync with schemas/replicant and handlers/game/events.go.
 
 // ─── enums ──────────────────────────────────────────────────────────
 

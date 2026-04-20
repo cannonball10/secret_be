@@ -1,7 +1,7 @@
 package game
 
 import (
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 )
 
 // ProgressReason names why the engine advanced a phase. It is attached
@@ -17,7 +17,7 @@ const (
 
 // --- typed event payloads --------------------------------------------------
 //
-// Each struct below corresponds to a secrethitler.EventType. They are
+// Each struct below corresponds to a replicant.EventType. They are
 // attached to the Envelope.Payload field so clients get typed data
 // without needing to re-interpret the map[string]any on GameEvent.Data.
 
@@ -46,8 +46,8 @@ type GameStartedPayload struct {
 // learn their own role (and, for fascists/Hitler in small games, their
 // teammates).
 type RoleAssignedPayload struct {
-	Role      secrethitler.Role  `json:"role"`
-	Party     secrethitler.Party `json:"party"`
+	Role      replicant.Role  `json:"role"`
+	Party     replicant.Party `json:"party"`
 	Teammates []TeammateInfo     `json:"teammates,omitempty"`
 }
 
@@ -56,7 +56,7 @@ type RoleAssignedPayload struct {
 type TeammateInfo struct {
 	PlayerID    string            `json:"playerId"`
 	DisplayName string            `json:"displayName"`
-	Role        secrethitler.Role `json:"role"`
+	Role        replicant.Role `json:"role"`
 }
 
 // ChancellorNominatedPayload accompanies a chancellor nomination. Round
@@ -84,7 +84,7 @@ type ElectionResultPayload struct {
 	Passed       bool                               `json:"passed"`
 	JaVotes      int                                `json:"jaVotes"`
 	NeinVotes    int                                `json:"neinVotes"`
-	Votes        map[string]secrethitler.VoteChoice `json:"votes"` // keyed by playerId
+	Votes        map[string]replicant.VoteChoice `json:"votes"` // keyed by playerId
 	Reason       ProgressReason                     `json:"reason"`
 }
 
@@ -92,20 +92,20 @@ type ElectionResultPayload struct {
 // election so they see the three policies they must choose from.
 type PoliciesDrawnPayload struct {
 	GovernmentID string                    `json:"governmentId"`
-	Policies     []secrethitler.PolicyType `json:"policies"`
+	Policies     []replicant.PolicyType `json:"policies"`
 }
 
 // PresidentDiscardedPayload is broadcast (counts only) and whispered to
 // the chancellor (with the two remaining policies).
 type PresidentDiscardedPayload struct {
 	GovernmentID string                    `json:"governmentId"`
-	Options      []secrethitler.PolicyType `json:"options,omitempty"` // chancellor-only
+	Options      []replicant.PolicyType `json:"options,omitempty"` // chancellor-only
 }
 
 // ChancellorEnactedPayload is broadcast when a policy is placed on the board.
 type ChancellorEnactedPayload struct {
 	GovernmentID           string                  `json:"governmentId"`
-	Policy                 secrethitler.PolicyType `json:"policy"`
+	Policy                 replicant.PolicyType `json:"policy"`
 	HumanPoliciesEnacted int                     `json:"humanPoliciesEnacted"`
 	AIPoliciesEnacted int                     `json:"aiPoliciesEnacted"`
 }
@@ -126,7 +126,7 @@ type VetoResolvedPayload struct {
 // president; for investigate, the target's party is whispered.
 type ExecutiveActionPayload struct {
 	ActionID          string                           `json:"actionId"`
-	Type              secrethitler.ExecutiveActionType `json:"type"`
+	Type              replicant.ExecutiveActionType `json:"type"`
 	PresidentPlayerID string                           `json:"presidentPlayerId"`
 	TargetPlayerID    string                           `json:"targetPlayerId,omitempty"`
 }
@@ -136,13 +136,13 @@ type ExecutiveActionPayload struct {
 type InvestigateResultPayload struct {
 	ActionID       string             `json:"actionId"`
 	TargetPlayerID string             `json:"targetPlayerId"`
-	Party          secrethitler.Party `json:"party"`
+	Party          replicant.Party `json:"party"`
 }
 
 // PolicyPeekPayload is whispered to the president after a Policy Peek.
 type PolicyPeekPayload struct {
 	ActionID string                    `json:"actionId"`
-	Policies []secrethitler.PolicyType `json:"policies"` // top 3, in order
+	Policies []replicant.PolicyType `json:"policies"` // top 3, in order
 }
 
 // ElectionTrackerPayload accompanies a tracker advance after a failed
@@ -153,7 +153,7 @@ type ElectionTrackerPayload struct {
 
 // TopDeckPayload announces a policy enacted by election-tracker advance.
 type TopDeckPayload struct {
-	Policy                 secrethitler.PolicyType `json:"policy"`
+	Policy                 replicant.PolicyType `json:"policy"`
 	HumanPoliciesEnacted int                     `json:"humanPoliciesEnacted"`
 	AIPoliciesEnacted int                     `json:"aiPoliciesEnacted"`
 }
@@ -174,8 +174,8 @@ type PlayerExecutedPayload struct {
 
 // GameEndedPayload announces the final result.
 type GameEndedPayload struct {
-	Winner       secrethitler.Party        `json:"winner"`
-	WinCondition secrethitler.WinCondition `json:"winCondition"`
+	Winner       replicant.Party        `json:"winner"`
+	WinCondition replicant.WinCondition `json:"winCondition"`
 }
 
 // NarratorSpeakPayload carries a synthesised narrator utterance. The
@@ -239,8 +239,8 @@ type CableLeakedPayload struct {
 // rollover) and after a Special Election, neither of which carry a
 // dedicated "president changed" event.
 type PhaseChangedPayload struct {
-	From          secrethitler.GamePhase `json:"from"`
-	To            secrethitler.GamePhase `json:"to"`
+	From          replicant.GamePhase `json:"from"`
+	To            replicant.GamePhase `json:"to"`
 	Reason        ProgressReason         `json:"reason"`
 	Deadline      string                 `json:"deadline,omitempty"` // RFC3339
 	PresidentSeat int                    `json:"presidentSeat"`

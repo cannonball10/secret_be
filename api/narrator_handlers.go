@@ -9,7 +9,7 @@ import (
 	"github.com/cannonball10/foundation/handlers/game"
 	"github.com/cannonball10/foundation/handlers/narrator"
 	"github.com/cannonball10/foundation/models"
-	"github.com/cannonball10/foundation/schemas/secrethitler"
+	"github.com/cannonball10/foundation/schemas/replicant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -131,7 +131,7 @@ func (s *Server) handleNarrate(c *gin.Context) {
 	// Host clients also have the dedicated audio endpoint as a
 	// fallback for cache validation.
 	audioURL := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(result.Audio)
-	ev := models.NewGameEvent(gameID, secrethitler.EventNarratorSpeak, "")
+	ev := models.NewGameEvent(gameID, replicant.EventNarratorSpeak, "")
 	payload := game.NarratorSpeakPayload{
 		CueID:    result.CueID,
 		Cue:      body.Cue,

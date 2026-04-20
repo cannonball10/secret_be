@@ -2,7 +2,7 @@
 
 A real-world social-deduction party game (Humans vs. AI) with a TV host display + mobile phones.
 
-This repo is mid-pivot from an earlier Secret Hitler prototype. The Go engine at the repo root (`cmd/api/`, `handlers/game/`, `models/`, `schemas/secrethitler/`) is intact and will be wired up as the realtime backend in Phase 2 — semantics already renamed to human / ai / rogue. The new monorepo (`apps/`, `packages/`) lives alongside it.
+This repo is mid-pivot from an earlier Replicant prototype. The Go engine at the repo root (`cmd/api/`, `handlers/game/`, `models/`, `schemas/replicant/`) is intact and will be wired up as the realtime backend in Phase 2 — semantics already renamed to human / ai / rogue. The new monorepo (`apps/`, `packages/`) lives alongside it.
 
 ## Status
 
@@ -26,7 +26,7 @@ replicant/
 ├─ cmd/api/               Go server entrypoint (will become apps/server in Phase 2)
 ├─ handlers/game/         Game engine (phase machine, rules, powers)
 ├─ models/                DynamoDB-backed entities
-├─ schemas/secrethitler/  Canonical enums (now human/ai/rogue)
+├─ schemas/replicant/  Canonical enums (now human/ai/rogue)
 └─ api/                   HTTP + SSE transport
 ```
 
