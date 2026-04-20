@@ -42,6 +42,7 @@ interface LastElection {
 
 interface Execution {
   playerName: string;
+  countryName: string;
   wasRogue: boolean;
   at: number;
 }
@@ -282,15 +283,31 @@ export default function HostGamePage() {
       if (type === "player_executed") {
         const p = env.payload as PlayerExecutedPayload | undefined;
         if (!p) return;
+        const victim = players[p.playerId];
         setPlayers((prev) => {
           const existing = prev[p.playerId];
           if (!existing) return prev;
           return { ...prev, [p.playerId]: { ...existing, isAlive: false } };
         });
         setExecution({
-          playerName: players[p.playerId]?.displayName ?? "Delegate",
+          playerName: victim?.displayName ?? "Delegate",
+          countryName: victim?.countryName ?? "",
           wasRogue: !!p.wasRogue,
           at: Date.now(),
+        });
+        // Auto-fire the nuclear-strike narrator cue so the Committee
+        // voices each strike as it lands. Keyed on eventId so React
+        // StrictMode double-invokes don't double-fire the LLM.
+        // Roles are scrubbed on the public snapshot mid-game, so we
+        // can only speak to the Prime flag here. Saying "HUMAN" for
+        // every non-Prime strike would leak info if the target was
+        // actually a Replicant; "not the Prime Replicant" preserves
+        // the mystery while still giving the narrator something to
+        // voice. The post-game roster reveals the real identities.
+        fireCue(`execution:${env.event.eventId}`, "execution", {
+          country: victim?.countryName ?? "the unidentified delegation",
+          name: victim?.displayName ?? "the delegate",
+          trueIdentity: p.wasRogue ? "the Prime Replicant" : "not the Prime Replicant",
         });
       }
 
@@ -375,7 +392,7 @@ export default function HostGamePage() {
             : "SESSION"
         }
         nodeId={`NODE ${code.slice(0, 6)}`}
-        phase={game ? `DAY ${String(game.round).padStart(2, "0")}` : "…"}
+        phase={game ? yearForRound(game.round) : "…"}
       >
         {err && (
           <div
@@ -564,7 +581,7 @@ function PhaseStage({
             title={"AWAITING\nCANDIDATE"}
             memo={
               presName
-                ? `"${titleCase(presName)}, President of this Committee, is selecting a Chancellor."`
+                ? `"${titleCase(presName)}, President of this Committee, is selecting an Envoy."`
                 : '"The Committee is drafting a nomination."'
             }
           />
@@ -576,7 +593,7 @@ function PhaseStage({
             title={"ENCRYPTED\nTRAFFIC"}
             memo={
               presName && chanName
-                ? `"${titleCase(presName)} has tabled ${titleCase(chanName)} for the Chancellery. Diplomatic cables are open. The Committee is listening."`
+                ? `"${titleCase(presName)} has tabled ${titleCase(chanName)} as their Envoy. Diplomatic cables are open. The Committee is listening."`
                 : '"Diplomatic cables are open. The Committee is listening."'
             }
           />
@@ -589,7 +606,7 @@ function PhaseStage({
               title={"CAST YOUR\nVERDICT"}
               memo={
                 presName && chanName
-                  ? `"${titleCase(presName)} presents ${titleCase(chanName)} for Chancellor. The Committee is voting."`
+                  ? `"${titleCase(presName)} presents ${titleCase(chanName)} as Envoy. The Committee is voting."`
                   : '"The Committee is voting."'
               }
             />
@@ -613,7 +630,7 @@ function PhaseStage({
         return (
           <BigLabel
             eyebrow="DRAFTING FLOOR"
-            title={"CHANCELLOR\nREVIEWING"}
+            title={"ENVOY\nDRAFTING"}
             memo={`"${titleCase(chanName)} is selecting a protocol to enact."`}
           />
         );
@@ -756,7 +773,7 @@ function VoteMeter({
         >
           PRES · {titleCase(presName).toUpperCase() || "—"}
           <br />
-          CHAN · {titleCase(chanName).toUpperCase() || "—"}
+          ENVOY · {titleCase(chanName).toUpperCase() || "—"}
         </div>
       </div>
       <div
@@ -1311,7 +1328,7 @@ function WinnerPanel({
             letterSpacing: 1.4,
           }}
         >
-          POPULATION STATUS · {alive} ACTIVE · {seated.length - alive} TERMINATED
+          POPULATION STATUS · {alive} ACTIVE · {seated.length - alive} STRUCK
         </div>
       </div>
 
@@ -1402,7 +1419,7 @@ function RosterRow({ player }: { player: Player }) {
           SEAT {String(player.seat + 1).padStart(2, "0")}
           {player.countryCode && ` · ${player.countryCode}`}
           {player.countryName && ` · ${player.countryName.toUpperCase()}`}
-          {dead && " · TERMINATED"}
+          {dead && " · STRUCK"}
         </div>
         <div
           style={{
@@ -1487,13 +1504,13 @@ function roleBadge(r: Role | "" | undefined): { label: string; color: string } {
 function winMemo(c: WinCondition): string {
   switch (c) {
     case "human_policies":
-      return '"Five human policies ratified. The collapse has been held back; humanity endures."';
+      return '"Five human policies ratified. The meltdown has been held back; humanity endures."';
     case "ai_policies":
-      return '"Six AI policies passed. The collapse unfolds in good order."';
+      return '"Six AI policies passed. The reactors go critical; the collapse unfolds."';
     case "rogue_elected_chancellor":
-      return '"The Prime has been elected to the Chancellery. The Committee yields its keys."';
+      return '"The Prime has been seated as Envoy with the codes live. The Committee yields its keys."';
     case "rogue_executed":
-      return '"The Prime has been terminated. The Committee resumes normal proceedings."';
+      return '"The Prime\'s nation has been struck from the register. The Committee resumes normal proceedings."';
     case "singularity_kingmaker":
       return '"The codes have passed to the Singularity. The Committee adjourns without a faction victor — a solitary actor has claimed the endgame."';
   }
@@ -1508,11 +1525,11 @@ function humanCondition(c: WinCondition): string {
     case "ai_policies":
       return "six AI protocols were passed";
     case "rogue_elected_chancellor":
-      return "the Prime was elected to the Chancellery";
+      return "the Prime was seated as Envoy while the codes were live";
     case "rogue_executed":
-      return "the Prime was terminated by execution";
+      return "the Prime's nation was struck by retaliatory order";
     case "singularity_kingmaker":
-      return "the Singularity took the Chancellery while the codes were live";
+      return "the Singularity took the Envoy's seat while the codes were live";
   }
 }
 
@@ -1647,7 +1664,7 @@ function TerminatedOverlay({ ex }: { ex: Execution }) {
       }}
     >
       <div className="t-eyebrow" style={{ color: rpColors.stampRed, fontSize: 14 }}>
-        ◼ DELEGATE TERMINATED
+        ◼ NUCLEAR STRIKE · RETALIATORY ORDER
       </div>
       <div
         style={{
@@ -1660,16 +1677,17 @@ function TerminatedOverlay({ ex }: { ex: Execution }) {
           textTransform: "uppercase",
         }}
       >
-        {ex.playerName}
+        {ex.countryName || ex.playerName}
       </div>
       <div
         style={{ fontFamily: "var(--font-typewriter)", fontSize: 22, color: rpColors.paper3, opacity: 0.85 }}
       >
-        &ldquo;…has been selected for TERMINATION.&rdquo;
+        &ldquo;…has been struck from the register. The delegation
+        is vaporised; the seat is void.&rdquo;
       </div>
       <div style={{ marginTop: 20 }}>
         <RPStamp variant="red" rotate={-8} size={56} animate>
-          TERMINATED
+          STRUCK
         </RPStamp>
       </div>
       {ex.wasRogue && (
@@ -1691,6 +1709,15 @@ function TerminatedOverlay({ ex }: { ex: Execution }) {
 }
 
 // ─── helpers ──────────────────────────────────────────────────────
+
+/** Convert an engine round counter (1-indexed) to the narrative year
+ *  shown on the host chrome. The first round is 5 years from today —
+ *  the Committee convenes in the near future to head off the meltdown. */
+function yearForRound(round: number): string {
+  if (round <= 0) return "—";
+  const base = new Date().getUTCFullYear() + 5;
+  return `YEAR ${base + round - 1}`;
+}
 
 function phaseTitle(p: Game["phase"]): string {
   switch (p) {
@@ -1724,7 +1751,7 @@ function execPhaseTitle(a: Game["pendingActionType"]): string {
     case "policy_peek":
       return "POLICY\nPEEK";
     case "execution":
-      return "EXECUTION\nORDER";
+      return "NUCLEAR\nSTRIKE";
     case "top_deck":
       return "TOP DECK\nPROTOCOL";
     default:

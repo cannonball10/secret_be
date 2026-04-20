@@ -88,6 +88,25 @@ func (h *GameHandler) SimulateGame(ctx context.Context, gameID string, cfg Simul
 		return
 	}
 
+	// Simulated demos turn on the features that require a narrator or
+	// larger lobbies: Cable Phase every round so the LLM rank/leak path
+	// is exercised, and Singularity seating for 6+ player games so the
+	// kingmaker win condition is reachable. The flags are no-ops for
+	// games created outside SimulateGame — production CreateGame stamps
+	// DefaultRules and never calls us.
+	g.Rules.CablePhaseMode = replicant.CableModeEveryRound
+	if cfg.Players >= 6 {
+		g.Rules.EnableSingularity = true
+	}
+	if err := h.saveGame(ctx, g); err != nil {
+		log.Error("failed to apply simulation rule overrides", "err", err)
+		return
+	}
+	log.Info("sim rules applied",
+		"cable", g.Rules.CablePhaseMode,
+		"singularity", g.Rules.EnableSingularity,
+		"duration_sec", g.Rules.CablePhaseDurationSec)
+
 	// Let the host's SSE subscription attach so early join envelopes
 	// land on the wire rather than in /dev/null.
 	if !sleep(ctx, cfg.StartDelay) {
@@ -401,11 +420,19 @@ func shortID(id string) string {
 
 // pickSimChancellor picks a uniformly random eligible chancellor. Uses
 // the same rule set as the engine so we never invite ErrIneligibleCandidate.
+// Logs a summary of the candidate pool + selection so the post-mortem
+// on a suspicious nomination (e.g. "Bot 4 picked Bot 0 but Bot 0 is dead")
+// can trace whether the simulator or the engine is responsible.
 func pickSimChancellor(game *models.Game, players []*models.Player, president *models.Player, rng *SeededRNG) *models.Player {
 	aliveCount := len(alivePlayers(players))
 	cand := make([]*models.Player, 0, len(players))
+	dead := 0
 	for _, p := range players {
-		if !p.IsAlive || p.PlayerID == president.PlayerID {
+		if !p.IsAlive {
+			dead++
+			continue
+		}
+		if p.PlayerID == president.PlayerID {
 			continue
 		}
 		if game.PreviousChancellorSeat != nil && *game.PreviousChancellorSeat == p.Seat {
@@ -417,9 +444,17 @@ func pickSimChancellor(game *models.Game, players []*models.Player, president *m
 		cand = append(cand, p)
 	}
 	if len(cand) == 0 {
+		slog.Warn("pickSimChancellor: no candidates",
+			"gameId", shortID(game.GameID), "presSeat", president.Seat,
+			"total", len(players), "dead", dead, "aliveCount", aliveCount)
 		return nil
 	}
-	return cand[rng.IntN(len(cand))]
+	pick := cand[rng.IntN(len(cand))]
+	slog.Debug("pickSimChancellor",
+		"gameId", shortID(game.GameID), "presSeat", president.Seat,
+		"pickSeat", pick.Seat, "pickAlive", pick.IsAlive,
+		"candidates", len(cand), "dead", dead)
+	return pick
 }
 
 // pickSimExecutiveTarget picks the first legal target, skipping

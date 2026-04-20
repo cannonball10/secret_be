@@ -619,8 +619,8 @@ function Body(props: BodyProps) {
     ? players[presidentPlayerId]?.displayName ?? "the President"
     : "the President";
   const chanName = chancellorPlayerId
-    ? players[chancellorPlayerId]?.displayName ?? "the Chancellor"
-    : "the Chancellor";
+    ? players[chancellorPlayerId]?.displayName ?? "the Envoy"
+    : "the Envoy";
 
   if (me && !me.isAlive) {
     const seated = Object.values(players);
@@ -663,7 +663,7 @@ function Body(props: BodyProps) {
       return (
         <WaitFor
           label={"AWAITING\nNOMINATION"}
-          sub={`"${titleCase(presName)} is selecting a Chancellor."`}
+          sub={`"${titleCase(presName)} is selecting an Envoy."`}
         />
       );
     }
@@ -1246,7 +1246,7 @@ function VotePanel({
       memo={
         <>
           Ratify or reject the proposed government. A YEA vote endorses{" "}
-          <b>{titleCase(chancellorName)}</b> as Chancellor under{" "}
+          <b>{titleCase(chancellorName)}</b> as Envoy under{" "}
           <b>{titleCase(presidentName)}</b>&apos;s presidency.
         </>
       }
@@ -1321,7 +1321,7 @@ function DiscardPanel({
       memo={
         <>
           Three protocols have been drawn from the deck.{" "}
-          <RPRedact>One you must discard</RPRedact>. The remaining two proceed to the Chancellor.
+          <RPRedact>One you must discard</RPRedact>. The remaining two proceed to your Envoy.
         </>
       }
     >
@@ -1571,7 +1571,7 @@ const ROLE_COPY: Record<
       </>
     ),
     objective:
-      "Outnumber the human delegates, or escort the Prime to the Chancellery once the Committee is on the brink.",
+      "Outnumber the human delegates, or seat the Prime as Envoy once the Committee is on the brink.",
   },
   rogue: {
     label: "PRIME",
@@ -1579,12 +1579,12 @@ const ROLE_COPY: Record<
     description: (
       <>
         You are the Prime Replicant — the AI's chosen vector within the Committee. Your kin
-        recognise you; you do not recognise them. If the Committee elects you Chancellor after
+        recognise you; you do not recognise them. If the Committee seats you as Envoy after
         three collapse policies have passed, the collapse completes.
       </>
     ),
     objective:
-      "Be elected Chancellor once three AI policies sit on the board. Otherwise, win alongside your kin.",
+      "Be seated as Envoy once three AI policies sit on the board. Otherwise, win alongside your kin.",
   },
   singularity: {
     label: "SINGULARITY",
@@ -1593,10 +1593,10 @@ const ROLE_COPY: Record<
       <>
         You are an unaccounted signal at the Committee's table — a presence neither the diplomats
         nor the Replicants can place. You know only yourself. Observe both sides. When the codes go
-        live, <RPRedact>take the Chancellery for yourself</RPRedact>.
+        live, <RPRedact>take the Envoy&apos;s seat for yourself</RPRedact>.
       </>
     ),
     objective:
-      "Be elected Chancellor after the nuclear codes transfer. You win alone — neither faction wins with you.",
+      "Be seated as Envoy after the nuclear codes transfer. You win alone — neither faction wins with you.",
   },
 };

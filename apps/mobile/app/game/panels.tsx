@@ -530,7 +530,7 @@ export function Terminated({
       }}
     >
       <RPStamp variant="red" rotate={-8} size={28} animate>
-        TERMINATED
+        STRUCK
       </RPStamp>
       <div
         style={{
@@ -543,9 +543,9 @@ export function Terminated({
           letterSpacing: "-0.01em",
         }}
       >
-        PROCESSING
+        DELEGATION
         <br />
-        COMPLETE
+        VAPORISED
       </div>
       <div
         className="t-memo"
@@ -557,8 +557,9 @@ export function Terminated({
           maxWidth: 320,
         }}
       >
-        &quot;Your credentials are revoked. You may observe the remainder of the
-        Committee&apos;s deliberations; you may not speak of them afterward.&quot;
+        &quot;Your delegation has been struck from the register. You may
+        observe the remainder of the Committee&apos;s deliberations;
+        you may not speak of them afterward.&quot;
       </div>
 
       {/* Live broadcast slab — mimics the manila debrief form. */}
@@ -612,7 +613,7 @@ export function Terminated({
           />
           <SpecStat label="PRESIDENT" value={presidentName.toUpperCase() || "—"} span={2} />
           {chancellorName && (
-            <SpecStat label="CHANCELLOR" value={chancellorName.toUpperCase()} span={2} />
+            <SpecStat label="ENVOY" value={chancellorName.toUpperCase()} span={2} />
           )}
         </div>
       </div>
@@ -758,15 +759,15 @@ export function GameOverPanel({
 function winMemo(c: WinCondition): string {
   switch (c) {
     case "human_policies":
-      return '"Five human policies ratified. The collapse has been held back; humanity endures."';
+      return '"Five human policies ratified. The meltdown has been held back; humanity endures."';
     case "ai_policies":
-      return '"Six AI policies passed. The collapse unfolds in good order."';
+      return '"Six AI policies passed. The reactors go critical; the collapse unfolds."';
     case "rogue_elected_chancellor":
-      return '"The Prime has been elected to the Chancellery. The Committee yields its keys."';
+      return '"The Prime has been seated as Envoy with the codes live. The Committee yields its keys."';
     case "rogue_executed":
-      return '"The Prime has been terminated. The Committee resumes normal proceedings."';
+      return '"The Prime\'s nation has been struck from the register. The Committee resumes."';
     case "singularity_kingmaker":
-      return '"The Singularity has taken the Chancellery. Neither faction prevails — a solitary victor claims the codes."';
+      return '"The Singularity has taken the Envoy\'s seat. Neither faction prevails — a solitary victor claims the codes."';
   }
 }
 
@@ -883,8 +884,8 @@ export const EXEC_COPY: Record<ExecutiveActionType, { title: string; memo: strin
     memo: '"You may review the next three policies to be drawn. Disclosure to fellow delegates is inadvisable."',
   },
   execution: {
-    title: "EXECUTION",
-    memo: '"Nominate one delegate for immediate termination. The Committee will action this without further review."',
+    title: "NUCLEAR\nSTRIKE",
+    memo: '"Designate one nation for a retaliatory nuclear strike. Their delegation will be struck from the register immediately."',
   },
   top_deck: {
     title: "TOP DECK",

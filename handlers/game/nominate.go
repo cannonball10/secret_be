@@ -3,6 +3,7 @@ package game
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/cannonball10/foundation/models"
@@ -34,7 +35,14 @@ func (h *GameHandler) NominateChancellor(ctx context.Context, gameID, presidentP
 	if chancellor == nil {
 		return nil, ErrPlayerNotFound
 	}
+	slog.Debug("NominateChancellor",
+		"gameId", gameID, "presSeat", president.Seat,
+		"chanSeat", chancellor.Seat, "chanAlive", chancellor.IsAlive,
+		"prevPresSeat", game.PreviousPresidentSeat, "prevChanSeat", game.PreviousChancellorSeat)
 	if err := validateChancellorEligibility(game, president, chancellor, players); err != nil {
+		slog.Warn("NominateChancellor: eligibility rejected",
+			"gameId", gameID, "chanSeat", chancellor.Seat,
+			"chanAlive", chancellor.IsAlive, "err", err)
 		return nil, err
 	}
 
