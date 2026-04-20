@@ -46,6 +46,11 @@ func (s *Server) registerRoutes() {
 	host.POST("/start", s.handleStartGame)
 	host.POST("/force-progress", s.handleForceProgress)
 	host.POST("/timer-tick", s.handleTimerTick)
+	host.POST("/narrate", s.handleNarrate)
+
+	// Narrator audio cache — broadcast scope, any authenticated
+	// device may fetch a cue's MP3 by id.
+	v1.GET("/narrator/audio/:cueId", s.handleNarratorAudio)
 
 	// Player actions (player devices)
 	player := v1.Group("/games/:gameId/player")
@@ -56,6 +61,7 @@ func (s *Server) registerRoutes() {
 	player.POST("/veto", s.handleProposeVeto)
 	player.POST("/veto/resolve", s.handleResolveVeto)
 	player.POST("/action", s.handleExecuteAction)
+	player.POST("/chat", s.handleChatSend)
 
 	// Streams (SSE). Auth middleware applies here too.
 	stream := v1.Group("/games/:gameId/stream")

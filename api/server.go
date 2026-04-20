@@ -20,19 +20,26 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/cannonball10/foundation/connectors/database"
 	"github.com/cannonball10/foundation/handlers/game"
+	"github.com/cannonball10/foundation/handlers/narrator"
 	"github.com/gin-gonic/gin"
 )
 
 // Server bundles the game engine, hub, and HTTP router.
 type Server struct {
-	engine *game.GameHandler
-	hub    game.Hub
-	router *gin.Engine
-	auth   Authenticator
-	db     database.DatabaseConnector
+	engine        *game.GameHandler
+	hub           game.Hub
+	router        *gin.Engine
+	auth          Authenticator
+	db            database.DatabaseConnector
+	simulate      bool
+	simConfig     game.SimulationConfig
+	narrator      *narrator.Narrator // optional; nil when LLM/TTS creds missing
+	narratorCache *narratorCache
 }
 
 // Options configures a Server.
@@ -53,6 +60,28 @@ type Options struct {
 
 	// GinMode sets gin's mode ("debug", "release", "test"). Defaults to release.
 	GinMode string
+
+	// SimulateOnCreate, when true, fires a bot-driven playthrough in a
+	// background goroutine every time CreateGame succeeds. Dev-only:
+	// pairs with game.SimulateGame to let the board device watch a full
+	// game without needing human players. Enable via SIMULATE_ON_CREATE=1.
+	SimulateOnCreate bool
+
+	// SimulateConfig tunes the playthrough when SimulateOnCreate is true.
+	// Zero-value fields fall back to game.SimulationConfig defaults.
+	SimulateConfig game.SimulationConfig
+
+	// AllowedOrigins, when non-empty, enables a CORS middleware that
+	// echoes back origins matching this list. An entry of "*" opens
+	// the server to any origin (dev only). Leave empty to rely on
+	// same-origin deployment or a front proxy / Next.js rewrite to
+	// handle CORS externally.
+	AllowedOrigins []string
+
+	// Narrator, when set, exposes POST /host/narrate and
+	// GET /narrator/audio/:cueId. Leave nil to disable the narrator
+	// (host screen will still render a greyed-out SPEAK button).
+	Narrator *narrator.Narrator
 }
 
 // NewServer constructs and wires a ready-to-serve Server.
@@ -68,22 +97,71 @@ func NewServer(opts Options) *Server {
 	}
 	gin.SetMode(opts.GinMode)
 
-	// Engine is wired to emit through the hub.
+	// Engine is wired to emit through the hub. If a narrator is
+	// configured, thread it into the engine so Cable Phase leaks can
+	// call RankCables + Speak without an extra layer.
 	engineOpts := append([]game.Option{
 		game.WithEmitter(game.NewHubEmitter(opts.Hub)),
 	}, opts.EngineOptions...)
+	if opts.Narrator != nil {
+		engineOpts = append(engineOpts, game.WithCableNarrator(opts.Narrator))
+	}
 	engine := game.NewGameHandler(opts.Database, engineOpts...)
 
 	s := &Server{
-		engine: engine,
-		hub:    opts.Hub,
-		auth:   opts.Auth,
-		db:     opts.Database,
-		router: gin.New(),
+		engine:        engine,
+		hub:           opts.Hub,
+		auth:          opts.Auth,
+		db:            opts.Database,
+		router:        gin.New(),
+		simulate:      opts.SimulateOnCreate,
+		simConfig:     opts.SimulateConfig,
+		narrator:      opts.Narrator,
+		narratorCache: newNarratorCache(5 * time.Minute),
 	}
 	s.router.Use(gin.Recovery())
+	if len(opts.AllowedOrigins) > 0 {
+		s.router.Use(corsMiddleware(opts.AllowedOrigins))
+	}
 	s.registerRoutes()
 	return s
+}
+
+// corsMiddleware is a minimal CORS layer. It echoes back the request's
+// Origin when it's in the allow-list (or when "*" is allow-listed) and
+// handles OPTIONS preflights. Tokens may travel on the query string for
+// SSE, so we explicitly allow that header family plus Authorization.
+func corsMiddleware(allowed []string) gin.HandlerFunc {
+	allowAll := false
+	for _, o := range allowed {
+		if o == "*" {
+			allowAll = true
+			break
+		}
+	}
+	allowSet := make(map[string]bool, len(allowed))
+	for _, o := range allowed {
+		allowSet[strings.ToLower(strings.TrimRight(o, "/"))] = true
+	}
+	return func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if origin != "" && (allowAll || allowSet[strings.ToLower(origin)]) {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			c.Header(
+				"Access-Control-Allow-Headers",
+				"Authorization, Content-Type, X-Auth-Token",
+			)
+			c.Header("Access-Control-Max-Age", "600")
+		}
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	}
 }
 
 // Handler exposes the underlying http.Handler so the caller can mount

@@ -75,7 +75,7 @@ func TestFullRound_LiberalPolicyEnacted(t *testing.T) {
 	// Pick a liberal option if available so we don't trigger a power.
 	enactIdx := 0
 	for i, p := range gov.ChancellorOptions {
-		if p == secrethitler.PolicyLiberal {
+		if p == secrethitler.PolicyHuman {
 			enactIdx = i
 			break
 		}

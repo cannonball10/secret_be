@@ -47,7 +47,7 @@ func driveGame(t *testing.T, seed uint64, playerCount int, strat driveStrategy, 
 	allPlayers, _ := h.loadPlayers(ctx, g.GameID)
 	var hitler *models.Player
 	for _, p := range allPlayers {
-		if p.IsHitler() {
+		if p.IsRogue() {
 			hitler = p
 			break
 		}
@@ -276,32 +276,32 @@ func TestActionMatrix_AllPlayerCounts(t *testing.T) {
 		strategy driveStrategy
 	}{
 		{"fascist_win_enact_fascist", driveStrategy{
-			preferEnact:   secrethitler.PolicyFascist,
-			preferDiscard: secrethitler.PolicyLiberal,
+			preferEnact:   secrethitler.PolicyAI,
+			preferDiscard: secrethitler.PolicyHuman,
 		}},
 		{"liberal_win_enact_liberal", driveStrategy{
-			preferEnact:   secrethitler.PolicyLiberal,
-			preferDiscard: secrethitler.PolicyFascist,
+			preferEnact:   secrethitler.PolicyHuman,
+			preferDiscard: secrethitler.PolicyAI,
 		}},
 		{"hitler_chancellor", driveStrategy{
-			preferEnact:    secrethitler.PolicyFascist,
-			preferDiscard:  secrethitler.PolicyLiberal,
+			preferEnact:    secrethitler.PolicyAI,
+			preferDiscard:  secrethitler.PolicyHuman,
 			nominateHitler: true,
 		}},
-		{"hitler_executed", driveStrategy{
-			preferEnact:   secrethitler.PolicyFascist,
-			preferDiscard: secrethitler.PolicyLiberal,
+		{"rogue_executed", driveStrategy{
+			preferEnact:   secrethitler.PolicyAI,
+			preferDiscard: secrethitler.PolicyHuman,
 			targetHitler:  true,
 		}},
 		{"veto_accept", driveStrategy{
-			preferEnact:   secrethitler.PolicyFascist,
-			preferDiscard: secrethitler.PolicyLiberal,
+			preferEnact:   secrethitler.PolicyAI,
+			preferDiscard: secrethitler.PolicyHuman,
 			proposeVeto:   true,
 			acceptVeto:    true,
 		}},
 		{"veto_reject", driveStrategy{
-			preferEnact:   secrethitler.PolicyFascist,
-			preferDiscard: secrethitler.PolicyLiberal,
+			preferEnact:   secrethitler.PolicyAI,
+			preferDiscard: secrethitler.PolicyHuman,
 			proposeVeto:   true,
 			acceptVeto:    false,
 		}},
@@ -369,10 +369,10 @@ func TestActionMatrix_AllPlayerCounts(t *testing.T) {
 
 			// All four win conditions should be seen across the strategies.
 			for _, wc := range []secrethitler.WinCondition{
-				secrethitler.WinLiberalPolicies,
-				secrethitler.WinFascistPolicies,
-				secrethitler.WinHitlerElected,
-				secrethitler.WinHitlerExecuted,
+				secrethitler.WinHumanPolicies,
+				secrethitler.WinAIPolicies,
+				secrethitler.WinRogueElected,
+				secrethitler.WinRogueExecuted,
 			} {
 				if winConditions[wc] == 0 {
 					t.Logf("note: win condition %s never produced at %d players (strategy coverage)", wc, playerCount)

@@ -83,6 +83,16 @@ func NewMemoryHub() *MemoryHub {
 	return &MemoryHub{subs: make(map[string]map[string]*Subscriber)}
 }
 
+// subscriberBufferSize is how many envelopes can be queued per
+// subscriber before the Hub starts dropping. 256 comfortably absorbs
+// a full round's burst (nominate + cable phase + election + vote
+// fan-out + legislative + optional executive + narrator audio) with
+// headroom for the next round to start queueing before the client
+// has drained the prior batch. Below ~64 we saw clients miss the
+// chancellor_nominated event when the simulator stacked rounds
+// faster than React could render.
+const subscriberBufferSize = 256
+
 // Subscribe implements Hub.
 func (h *MemoryHub) Subscribe(gameID string, role DeviceRole, playerID string) *Subscriber {
 	h.mu.Lock()
@@ -93,7 +103,7 @@ func (h *MemoryHub) Subscribe(gameID string, role DeviceRole, playerID string) *
 		GameID:     gameID,
 		DeviceRole: role,
 		PlayerID:   playerID,
-		Send:       make(chan Envelope, 32),
+		Send:       make(chan Envelope, subscriberBufferSize),
 	}
 	game, ok := h.subs[gameID]
 	if !ok {

@@ -5,8 +5,19 @@
 package game
 
 import (
+	"context"
+
 	"github.com/cannonball10/foundation/connectors/database"
+	"github.com/cannonball10/foundation/handlers/narrator"
 )
+
+// CableNarrator is the narrow interface the engine needs for Cable
+// Phase leaks. The real implementation is *narrator.Narrator; tests
+// that don't care about narration skip WithCableNarrator entirely.
+type CableNarrator interface {
+	RankCables(ctx context.Context, cables []narrator.Cable) ([]narrator.ScoredCable, error)
+	Speak(ctx context.Context, cue narrator.Cue) (*narrator.Result, error)
+}
 
 // GameHandler is the root of the game state machine.
 //
@@ -20,11 +31,12 @@ import (
 // connectors.Connectors struct so it can be unit-tested without wiring
 // every other connector in the system.
 type GameHandler struct {
-	db      database.DatabaseConnector
-	emitter Emitter
-	clock   Clock
-	rng     RNG
-	config  Config
+	db       database.DatabaseConnector
+	emitter  Emitter
+	clock    Clock
+	rng      RNG
+	config   Config
+	narrator CableNarrator // optional — when nil the engine skips cable ranking
 }
 
 // Option configures a GameHandler at construction time.
@@ -48,6 +60,13 @@ func WithRNG(r RNG) Option {
 // WithConfig overrides the default timer/config values.
 func WithConfig(c Config) Option {
 	return func(h *GameHandler) { h.config = c }
+}
+
+// WithCableNarrator wires the Cable Phase LLM scorer + speaker.
+// Optional: without it, the engine closes Cable Phase silently (no
+// leak, no narrator output). Production wires *narrator.Narrator.
+func WithCableNarrator(n CableNarrator) Option {
+	return func(h *GameHandler) { h.narrator = n }
 }
 
 // NewGameHandler constructs a GameHandler with sensible defaults.

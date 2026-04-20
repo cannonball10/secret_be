@@ -108,11 +108,11 @@ func TestStartGame_RandomPresidentAndRoleDeal(t *testing.T) {
 	libs, fascs, hits := 0, 0, 0
 	for _, p := range fresh {
 		switch p.Role {
-		case secrethitler.RoleLiberal:
+		case secrethitler.RoleHuman:
 			libs++
-		case secrethitler.RoleFascist:
+		case secrethitler.RoleAI:
 			fascs++
-		case secrethitler.RoleHitler:
+		case secrethitler.RoleRogue:
 			hits++
 		}
 	}

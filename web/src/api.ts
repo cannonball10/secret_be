@@ -24,18 +24,28 @@ export class ApiClient {
 
   // ─── lobby ────────────────────────────────────────────────────
 
-  createGame(joinCode: string, displayName: string) {
-    return this.post<{ game: Game; player: Player }>("/api/v1/games", {
-      joinCode,
-      displayName,
+  // createGame posts to /games. Both fields are optional: an empty
+  // joinCode asks the server to generate one, and an empty displayName
+  // creates a board-only lobby where the host device is a spectator
+  // (no Player record). When displayName is empty the server responds
+  // with `player: null`.
+  createGame(joinCode?: string, displayName?: string) {
+    return this.post<{ game: Game; player: Player | null }>("/api/v1/games", {
+      joinCode: joinCode ?? "",
+      displayName: displayName ?? "",
     });
   }
 
+  // joinGame returns the caller's Player record plus the full seat list
+  // (roles scrubbed for everyone except the caller) so the joining
+  // device has a complete lobby snapshot immediately — MemoryHub
+  // doesn't replay, so any players who joined before the SSE opened
+  // would otherwise be invisible forever.
   joinGame(joinCode: string, displayName: string) {
-    return this.post<{ game: Game; player: Player }>("/api/v1/games/join", {
-      joinCode,
-      displayName,
-    });
+    return this.post<{ game: Game; player: Player; players: Player[] }>(
+      "/api/v1/games/join",
+      { joinCode, displayName },
+    );
   }
 
   getGame(gameId: string) {

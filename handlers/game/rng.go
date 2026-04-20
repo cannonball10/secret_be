@@ -16,6 +16,9 @@ type RNG interface {
 	// Shuffle reorders a slice of length n in place using the Fisher-Yates
 	// algorithm. swap is called with index pairs that should exchange.
 	Shuffle(n int, swap func(i, j int))
+	// Float64 returns a uniformly random float in [0, 1). Used by
+	// probabilistic paths like the Cable Phase silence roll.
+	Float64() float64
 }
 
 // CryptoRNG is a crypto/rand-backed RNG suitable for production. For
@@ -50,6 +53,14 @@ func (r CryptoRNG) Shuffle(n int, swap func(i, j int)) {
 	}
 }
 
+// Float64 implements RNG using 53 bits of CSPRNG output.
+func (CryptoRNG) Float64() float64 {
+	var buf [8]byte
+	_, _ = rand.Read(buf[:])
+	// Discard 11 bits to land in [0, 2^53) then divide to [0, 1).
+	return float64(binary.BigEndian.Uint64(buf[:])>>11) / (1 << 53)
+}
+
 // SeededRNG is a deterministic RNG for tests. It uses a simple linear
 // congruential generator; not suitable for production.
 type SeededRNG struct {
@@ -74,4 +85,11 @@ func (r *SeededRNG) Shuffle(n int, swap func(i, j int)) {
 		j := r.IntN(i + 1)
 		swap(i, j)
 	}
+}
+
+// Float64 implements RNG. Uses the same LCG state as IntN.
+func (r *SeededRNG) Float64() float64 {
+	r.State = r.State*6364136223846793005 + 1442695040888963407
+	// Take upper 53 bits and normalise.
+	return float64(r.State>>11) / (1 << 53)
 }

@@ -69,6 +69,9 @@ func (h *GameHandler) advance(ctx context.Context, game *models.Game, reason Pro
 		_, _, err := h.onElectionFailed(ctx, game, players, reason)
 		return err
 
+	case secrethitler.PhaseCablePhase:
+		return h.advanceFromCablePhase(ctx, game, reason)
+
 	case secrethitler.PhaseElection:
 		votes, err := h.loadVotesForGovernment(ctx, game.GameID, game.CurrentGovernmentID)
 		if err != nil {

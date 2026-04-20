@@ -127,15 +127,15 @@ func (h *GameHandler) ExecuteAction(ctx context.Context, gameID, presidentPlayer
 		h.broadcast(ctx, models.NewGameEvent(gameID, secrethitler.EventPlayerExecuted, presidentPlayerID).WithTarget(target.PlayerID),
 			PlayerExecutedPayload{
 				PlayerID:       target.PlayerID,
-				WasHitler:      target.IsHitler(),
+				WasRogue:      target.IsRogue(),
 				ExecutedBySeat: president.Seat,
 			})
-		if target.IsHitler() {
+		if target.IsRogue() {
 			action.Complete()
 			if err := h.db.Upsert(ctx, nil, action); err != nil {
 				return err
 			}
-			return h.endGame(ctx, game, secrethitler.PartyLiberal, secrethitler.WinHitlerExecuted)
+			return h.endGame(ctx, game, secrethitler.PartyHuman, secrethitler.WinRogueExecuted)
 		}
 
 	default:

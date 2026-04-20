@@ -39,8 +39,11 @@ func userID(c *gin.Context) string {
 }
 
 // extractBearerToken pulls the token out of "Authorization: Bearer X".
-// Also accepts a raw token in the X-Auth-Token header as a convenience
-// for device clients that do not want to set Authorization.
+// Falls back to the X-Auth-Token header, then to a "token" query-string
+// parameter — browser EventSource cannot set custom headers, so the SSE
+// clients embed the token in the URL. In production you'd either
+// terminate auth upstream or swap EventSource for fetch-based SSE so
+// that query-string tokens never hit logs.
 func extractBearerToken(c *gin.Context) string {
 	auth := c.GetHeader("Authorization")
 	if auth != "" {
@@ -49,5 +52,8 @@ func extractBearerToken(c *gin.Context) string {
 		}
 		return strings.TrimSpace(auth)
 	}
-	return strings.TrimSpace(c.GetHeader("X-Auth-Token"))
+	if t := strings.TrimSpace(c.GetHeader("X-Auth-Token")); t != "" {
+		return t
+	}
+	return strings.TrimSpace(c.Query("token"))
 }

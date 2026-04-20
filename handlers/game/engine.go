@@ -37,7 +37,67 @@ func (h *GameHandler) loadGame(ctx context.Context, gameID string) (*models.Game
 	if m == nil {
 		return nil, ErrGameNotFound
 	}
-	return m.(*models.Game), nil
+	g := m.(*models.Game)
+	ensureRules(g)
+	return g, nil
+}
+
+// ensureRules substitutes DefaultRules when the loaded Game has a
+// zero or incomplete RulesConfig. Called from EVERY path that hydrates
+// a Game from storage (loadGame, lookupByJoinCode, snapshot reads)
+// so engine reads of game.Rules.X always see valid values.
+//
+// Two failure modes this guards against:
+//  1. Records that predate the RulesConfig field deserialise with
+//     Rules == zero-value (all fields 0). `len(players) >= MaxPlayers`
+//     would read as `>= 0` — true for any player count — and every
+//     join is rejected.
+//  2. Records saved partway through the RulesConfig rollout may have
+//     a few fields set but core ones (MaxPlayers, win thresholds) at
+//     zero. Per-field defaulting handles that without invalidating a
+//     legitimate host-authored override.
+func ensureRules(g *models.Game) {
+	if g.Rules.IsZero() {
+		g.Rules = secrethitler.DefaultRules()
+		return
+	}
+	// Per-field backfill for partial records. Only fill fields that
+	// would crash the engine if left at zero; leave fields the host
+	// might intentionally set low (e.g. silence chance = 0) alone.
+	d := secrethitler.DefaultRules()
+	if g.Rules.MinPlayers <= 0 {
+		g.Rules.MinPlayers = d.MinPlayers
+	}
+	if g.Rules.MaxPlayers <= 0 {
+		g.Rules.MaxPlayers = d.MaxPlayers
+	}
+	if g.Rules.HumanProtocolsInDeck <= 0 {
+		g.Rules.HumanProtocolsInDeck = d.HumanProtocolsInDeck
+	}
+	if g.Rules.AIProtocolsInDeck <= 0 {
+		g.Rules.AIProtocolsInDeck = d.AIProtocolsInDeck
+	}
+	if g.Rules.HumanPoliciesToWin <= 0 {
+		g.Rules.HumanPoliciesToWin = d.HumanPoliciesToWin
+	}
+	if g.Rules.AIPoliciesToWin <= 0 {
+		g.Rules.AIPoliciesToWin = d.AIPoliciesToWin
+	}
+	if g.Rules.CodesTransferAt <= 0 {
+		g.Rules.CodesTransferAt = d.CodesTransferAt
+	}
+	if g.Rules.ElectionTrackerLimit <= 0 {
+		g.Rules.ElectionTrackerLimit = d.ElectionTrackerLimit
+	}
+	if g.Rules.VetoUnlockAt <= 0 {
+		g.Rules.VetoUnlockAt = d.VetoUnlockAt
+	}
+	if g.Rules.CablePhaseMode == "" {
+		g.Rules.CablePhaseMode = d.CablePhaseMode
+	}
+	if g.Rules.CablePhaseDurationSec <= 0 {
+		g.Rules.CablePhaseDurationSec = d.CablePhaseDurationSec
+	}
 }
 
 // saveGame persists the game.
@@ -132,7 +192,7 @@ func reasonFromCtx(ctx context.Context, fallback ProgressReason) ProgressReason 
 func (h *GameHandler) setPhase(ctx context.Context, g *models.Game, to secrethitler.GamePhase, reason ProgressReason) *models.GameEvent {
 	from := g.Phase
 	g.Phase = to
-	g.PhaseDeadline = h.deadlineFor(to)
+	g.PhaseDeadline = h.deadlineFor(g, to)
 
 	reason = reasonFromCtx(ctx, reason)
 
@@ -141,12 +201,19 @@ func (h *GameHandler) setPhase(ctx context.Context, g *models.Game, to secrethit
 	if g.PhaseDeadline != nil {
 		deadlineStr = g.PhaseDeadline.UTC().Format(time.RFC3339)
 	}
-	payload := PhaseChangedPayload{From: from, To: to, Reason: reason, Deadline: deadlineStr}
+	payload := PhaseChangedPayload{
+		From:          from,
+		To:            to,
+		Reason:        reason,
+		Deadline:      deadlineStr,
+		PresidentSeat: g.PresidentSeat,
+	}
 	ev.WithData(map[string]any{
-		"from":     string(from),
-		"to":       string(to),
-		"reason":   string(reason),
-		"deadline": deadlineStr,
+		"from":          string(from),
+		"to":            string(to),
+		"reason":        string(reason),
+		"deadline":      deadlineStr,
+		"presidentSeat": g.PresidentSeat,
 	})
 	h.broadcast(ctx, ev, payload)
 	return ev
@@ -167,12 +234,16 @@ func eventTypeForPhase(p secrethitler.GamePhase) secrethitler.EventType {
 
 // deadlineFor computes the phase deadline from the configured timeouts.
 // Returns nil for phases that do not auto-advance (lobby, game_over).
-func (h *GameHandler) deadlineFor(p secrethitler.GamePhase) *time.Time {
+// Cable Phase reads its duration from the game's RulesConfig (per-game
+// customisable); all other phases pull from the engine-wide Config.
+func (h *GameHandler) deadlineFor(g *models.Game, p secrethitler.GamePhase) *time.Time {
 	now := h.clock.Now()
 	var d time.Duration
 	switch p {
 	case secrethitler.PhaseNomination:
 		d = h.config.NominationTimeout
+	case secrethitler.PhaseCablePhase:
+		d = time.Duration(g.Rules.CablePhaseDurationSec) * time.Second
 	case secrethitler.PhaseElection:
 		d = h.config.ElectionTimeout
 	case secrethitler.PhaseLegislativePresident, secrethitler.PhaseLegislativeChancellor:
@@ -182,6 +253,9 @@ func (h *GameHandler) deadlineFor(p secrethitler.GamePhase) *time.Time {
 	case secrethitler.PhaseVetoRequested:
 		d = h.config.VetoTimeout
 	default:
+		return nil
+	}
+	if d <= 0 {
 		return nil
 	}
 	t := now.Add(d)

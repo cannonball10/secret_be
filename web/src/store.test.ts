@@ -44,8 +44,8 @@ function mkGame(): Game {
     phase: "lobby",
     round: 0,
     presidentSeat: 0,
-    liberalPoliciesEnacted: 0,
-    fascistPoliciesEnacted: 0,
+    humanPoliciesEnacted: 0,
+    aiPoliciesEnacted: 0,
     electionTracker: 0,
     vetoUnlocked: false,
     playerCount: 0,
@@ -80,7 +80,7 @@ describe("reducer", () => {
       gameId: "g1",
       event: { eventId: "e", gameId: "g1", type: "game_started", createdAt: "", updatedAt: "" },
       audience: { scope: "broadcast" },
-      payload: { playerCount: 5, initialPresidentSeat: 2 },
+      payload: { playerCount: 5, initialPresidentSeat: 2, round: 1 },
     }));
     assert.equal(s.game?.phase, "nomination");
     assert.equal(s.game?.playerCount, 5);
@@ -99,17 +99,17 @@ describe("reducer", () => {
       gameId: "g1",
       event: { eventId: "e1", gameId: "g1", type: "roles_assigned", createdAt: "", updatedAt: "" },
       audience: { scope: "player", playerId: "p1" },
-      payload: { role: "hitler", party: "fascist", teammates: [] },
+      payload: { role: "rogue", party: "ai", teammates: [] },
     }));
-    assert.equal(s.me.role, "hitler");
+    assert.equal(s.me.role, "rogue");
     // Whisper addressed to someone else → ignored.
     s = reducer(s, envelope({
       gameId: "g1",
       event: { eventId: "e2", gameId: "g1", type: "roles_assigned", createdAt: "", updatedAt: "" },
       audience: { scope: "player", playerId: "p2" },
-      payload: { role: "liberal", party: "liberal" },
+      payload: { role: "human", party: "human" },
     }));
-    assert.equal(s.me.role, "hitler");
+    assert.equal(s.me.role, "rogue");
   });
 
   it("tracks vote fingerprints without revealing choices until result lands", () => {
@@ -153,7 +153,7 @@ describe("reducer", () => {
       game: {
         ...mkGame(),
         electionTracker: 2,
-        fascistPoliciesEnacted: 2,
+        aiPoliciesEnacted: 2,
       },
       players: [mkPlayer({ playerId: "p1", seat: 0, displayName: "A" })],
       mePlayerId: "p1",
@@ -164,12 +164,12 @@ describe("reducer", () => {
       audience: { scope: "broadcast" },
       payload: {
         governmentId: "gov1",
-        policy: "fascist",
-        liberalPoliciesEnacted: 0,
-        fascistPoliciesEnacted: 3,
+        policy: "ai",
+        humanPoliciesEnacted: 0,
+        aiPoliciesEnacted: 3,
       },
     }));
-    assert.equal(s.fascist, 3);
+    assert.equal(s.ai, 3);
     assert.equal(s.tracker, 0);
   });
 
@@ -187,7 +187,7 @@ describe("reducer", () => {
       gameId: "g1",
       event: { eventId: "e", gameId: "g1", type: "player_executed", createdAt: "", updatedAt: "" },
       audience: { scope: "broadcast" },
-      payload: { playerId: "p2", wasHitler: false, executedBySeat: 0 },
+      payload: { playerId: "p2", wasRogue: false, executedBySeat: 0 },
     }));
     assert.equal(s.players["p2"].isAlive, false);
     assert.equal(s.players["p1"].isAlive, true);
@@ -204,10 +204,10 @@ describe("reducer", () => {
       gameId: "g1",
       event: { eventId: "e", gameId: "g1", type: "game_ended", createdAt: "", updatedAt: "" },
       audience: { scope: "broadcast" },
-      payload: { winner: "liberal", winCondition: "hitler_executed" },
+      payload: { winner: "human", winCondition: "rogue_executed" },
     }));
-    assert.equal(s.winner, "liberal");
-    assert.equal(s.winCondition, "hitler_executed");
+    assert.equal(s.winner, "human");
+    assert.equal(s.winCondition, "rogue_executed");
     assert.equal(s.game?.status, "completed");
   });
 

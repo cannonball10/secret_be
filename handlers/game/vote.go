@@ -141,10 +141,23 @@ func (h *GameHandler) resolveElection(ctx context.Context, game *models.Game, pl
 // elected-then-vetoed agenda leaves the tracker intact. The reset
 // therefore lives in applyEnactedPolicy.
 func (h *GameHandler) onElectionPassed(ctx context.Context, game *models.Game, gov *models.Government, players []*models.Player) (*models.Government, bool, error) {
-	// Hitler-chancellor win condition.
+	// Codes-transferred chancellor win conditions. Once the AI cabal
+	// has pushed the Earth Policy Committee past the codes-transfer
+	// threshold, electing a compromised Chancellor hands them the
+	// nuclear codes. Two mutually exclusive winners are possible:
+	//
+	//   1. Chancellor is the Prime (rogue) → AI cabal victory.
+	//   2. Chancellor is the Singularity → kingmaker victory
+	//      (Singularity alone wins, stealing the endgame from both
+	//       sides). Only reachable when Rules.EnableSingularity is on.
 	chancellor := findPlayerBySeat(players, *gov.ChancellorSeat)
-	if chancellor != nil && chancellor.IsHitler() && game.HitlerZoneActive() {
-		return gov, true, h.endGame(ctx, game, secrethitler.PartyFascist, secrethitler.WinHitlerElected)
+	if chancellor != nil && game.RogueZoneActive() {
+		if chancellor.IsRogue() {
+			return gov, true, h.endGame(ctx, game, secrethitler.PartyAI, secrethitler.WinRogueElected)
+		}
+		if chancellor.IsSingularity() {
+			return gov, true, h.endGame(ctx, game, secrethitler.PartySingularity, secrethitler.WinSingularityKingmaker)
+		}
 	}
 
 	// Draw 3 policies for the president.
@@ -178,7 +191,7 @@ func (h *GameHandler) onElectionFailed(ctx context.Context, game *models.Game, p
 	ev := models.NewGameEvent(game.GameID, secrethitler.EventElectionTracker, "")
 	h.broadcast(ctx, ev, ElectionTrackerPayload{Tracker: game.ElectionTracker})
 
-	if game.ElectionTracker >= secrethitler.ElectionTrackerLimit {
+	if game.ElectionTracker >= game.Rules.ElectionTrackerLimit {
 		// Top-deck: enact the top policy, clear term limits, reset tracker.
 		// topDeck → applyEnactedPolicy already rotates the presidency
 		// and sets the next phase, so we return here without another

@@ -62,6 +62,22 @@ func RoleDistribution(playerCount int) (liberals, fascists, hitlers int, ok bool
 	return 0, 0, 0, false
 }
 
+// RoleDistributionWithSingularity returns seating for the 3-faction
+// variant: one Singularity seat drawn from the liberal allotment of
+// the vanilla distribution. Only defined for 6+ player counts — the
+// 5-player distribution leaves liberals too outnumbered once one seat
+// is spent on the Singularity. Call RoleDistribution for vanilla.
+func RoleDistributionWithSingularity(playerCount int) (liberals, fascists, hitlers, singularities int, ok bool) {
+	if playerCount < 6 {
+		return 0, 0, 0, 0, false
+	}
+	l, f, h, ok := RoleDistribution(playerCount)
+	if !ok {
+		return 0, 0, 0, 0, false
+	}
+	return l - 1, f, h, 1, true
+}
+
 // VetoUnlockThreshold is the fascist-policy count at which the chancellor
 // and president may jointly veto an agenda.
 const VetoUnlockThreshold = 5

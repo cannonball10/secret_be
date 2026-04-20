@@ -3,6 +3,7 @@ package game
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/cannonball10/foundation/models"
@@ -10,31 +11,42 @@ import (
 	"github.com/cannonball10/foundation/schemas/secrethitler"
 )
 
-// CreateGame creates a new lobby hosted by the given user. The caller
-// should generate a short join code (e.g. 5 uppercase letters) that
-// players type into the mobile app. Collisions are left to the caller
-// to retry; the database layer will reject duplicates via the join-code
-// GSI in production.
+// CreateGame creates a new lobby hosted by the given user.
+//
+// joinCode is optional: pass "" to have the engine generate a random
+// 6-char alphanumeric code. Non-empty codes are uppercased and used
+// verbatim — collisions are the caller's problem (the join-code GSI
+// enforces uniqueness in production).
+//
+// hostDisplayName is optional: pass "" to create a "board-only" lobby
+// where the host device is a spectator (no Player record, not seated,
+// not dealt a role). Players join separately via JoinGame. When non-
+// empty the host is seated at seat 0 — the classic self-as-first-player
+// flow — and the returned *models.Player is non-nil.
 func (h *GameHandler) CreateGame(ctx context.Context, hostUserID, joinCode, hostDisplayName string) (*models.Game, *models.Player, error) {
 	joinCode = strings.ToUpper(strings.TrimSpace(joinCode))
 	if joinCode == "" {
-		return nil, nil, fmt.Errorf("%w: joinCode required", ErrInvalidTransition)
+		joinCode = h.generateJoinCode()
 	}
 	game := models.NewGame(nil, joinCode, hostUserID)
 
-	// Host is implicitly the first player in the lobby at seat 0.
-	host := models.NewPlayer(nil, game.GameID, hostUserID, hostDisplayName, true)
-	host.Seat = 0
-
 	if err := h.saveGame(ctx, game); err != nil {
-		return nil, nil, err
-	}
-	if err := h.db.Upsert(ctx, nil, host); err != nil {
 		return nil, nil, err
 	}
 
 	createdEvent := models.NewGameEvent(game.GameID, secrethitler.EventGameCreated, hostUserID)
 	h.broadcast(ctx, createdEvent, GameCreatedPayload{JoinCode: joinCode, HostUserID: hostUserID})
+
+	// Board-only host: return early with a nil Player.
+	if strings.TrimSpace(hostDisplayName) == "" {
+		return game, nil, nil
+	}
+
+	host := models.NewPlayer(nil, game.GameID, hostUserID, hostDisplayName, true)
+	host.Seat = 0
+	if err := h.db.Upsert(ctx, nil, host); err != nil {
+		return nil, nil, err
+	}
 
 	joinedEvent := models.NewGameEvent(game.GameID, secrethitler.EventPlayerJoined, host.PlayerID)
 	h.broadcast(ctx, joinedEvent, PlayerJoinedPayload{
@@ -44,6 +56,20 @@ func (h *GameHandler) CreateGame(ctx context.Context, hostUserID, joinCode, host
 	})
 
 	return game, host, nil
+}
+
+// joinCodeAlphabet intentionally excludes ambiguous glyphs (0/O, 1/I/L)
+// so hosts can read the code aloud without players mistyping it.
+const joinCodeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+// generateJoinCode returns a 6-character alphanumeric code using the
+// engine's RNG so tests can pin it via a seeded RNG.
+func (h *GameHandler) generateJoinCode() string {
+	b := make([]byte, 6)
+	for i := range b {
+		b[i] = joinCodeAlphabet[h.rng.IntN(len(joinCodeAlphabet))]
+	}
+	return string(b)
 }
 
 // JoinGame adds a player to a lobby keyed by join code. Rejects joins
@@ -61,7 +87,22 @@ func (h *GameHandler) JoinGame(ctx context.Context, joinCode, userID, displayNam
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(players) >= secrethitler.MaxPlayers {
+	// Belt-and-suspenders: defend against legacy Game records where
+	// Rules.MaxPlayers round-trips as a bogus low value (0 from a
+	// missing field, or a partial-write leftover). ensureRules already
+	// backfills these on load, but if something slips through we clamp
+	// to the package maximum so a single bad record can't strand a
+	// full-sized table.
+	maxP := game.Rules.MaxPlayers
+	if maxP <= 0 || maxP > secrethitler.PackageMaxPlayers {
+		slog.Warn("joinGame: Rules.MaxPlayers out of range, using package max",
+			"gameId", game.GameID, "stored", maxP)
+		maxP = secrethitler.PackageMaxPlayers
+	}
+	if len(players) >= maxP {
+		slog.Info("joinGame: table full",
+			"gameId", game.GameID, "players", len(players), "max", maxP,
+			"storedMin", game.Rules.MinPlayers, "storedMax", game.Rules.MaxPlayers)
 		return nil, nil, ErrTooManyPlayers
 	}
 	// Dedupe by userId so refreshing the mobile app doesn't seat twice.
@@ -101,7 +142,9 @@ func (h *GameHandler) lookupByJoinCode(ctx context.Context, joinCode string) (*m
 	if len(out.Models) == 0 {
 		return nil, ErrGameNotFound
 	}
-	return out.Models[0].(*models.Game), nil
+	g := out.Models[0].(*models.Game)
+	ensureRules(g)
+	return g, nil
 }
 
 // StartGame transitions a lobby into an in-progress game. Only the host
@@ -127,16 +170,26 @@ func (h *GameHandler) StartGame(ctx context.Context, gameID, hostUserID string) 
 	if err != nil {
 		return nil, err
 	}
-	if len(players) < secrethitler.MinPlayers {
+	if len(players) < game.Rules.MinPlayers {
 		return nil, ErrNotEnoughPlayers
 	}
-	if len(players) > secrethitler.MaxPlayers {
+	if len(players) > game.Rules.MaxPlayers {
 		return nil, ErrTooManyPlayers
 	}
 
 	// Deal roles.
 	if err := h.dealRoles(ctx, game, players); err != nil {
 		return nil, err
+	}
+
+	// Assign a country to each seated delegate. The CommitteeRoster
+	// is seat-indexed so repeated games on the same table pick up the
+	// same delegation in the same chair — useful for habitual groups
+	// that think of "Priya plays France" as part of the identity.
+	for _, p := range players {
+		country := secrethitler.CountryForSeat(p.Seat)
+		p.CountryCode = country.Code
+		p.CountryName = country.Name
 	}
 
 	// Build the deck.
@@ -157,6 +210,7 @@ func (h *GameHandler) StartGame(ctx context.Context, gameID, hostUserID string) 
 	h.broadcast(ctx, started, GameStartedPayload{
 		PlayerCount:          len(players),
 		InitialPresidentSeat: initialSeat,
+		Round:                game.Round,
 	})
 
 	h.setPhase(ctx, game, secrethitler.PhaseNomination, ReasonAction)
@@ -176,22 +230,26 @@ func (h *GameHandler) StartGame(ctx context.Context, gameID, hostUserID string) 
 
 // dealRoles assigns roles to the players using the configured RNG and
 // whispers each player their private role (plus teammates where the
-// rules require).
+// rules require). Honours Rules.EnableSingularity by picking the
+// distribution table — either vanilla or Singularity-included.
 func (h *GameHandler) dealRoles(ctx context.Context, game *models.Game, players []*models.Player) error {
-	liberals, fascists, hitlers, ok := secrethitler.RoleDistribution(len(players))
+	liberals, fascists, hitlers, singularities, ok := rolesSeating(game, len(players))
 	if !ok {
 		return ErrNotEnoughPlayers
 	}
 
-	roles := make([]secrethitler.Role, 0, liberals+fascists+hitlers)
+	roles := make([]secrethitler.Role, 0, liberals+fascists+hitlers+singularities)
 	for i := 0; i < liberals; i++ {
-		roles = append(roles, secrethitler.RoleLiberal)
+		roles = append(roles, secrethitler.RoleHuman)
 	}
 	for i := 0; i < fascists; i++ {
-		roles = append(roles, secrethitler.RoleFascist)
+		roles = append(roles, secrethitler.RoleAI)
 	}
 	for i := 0; i < hitlers; i++ {
-		roles = append(roles, secrethitler.RoleHitler)
+		roles = append(roles, secrethitler.RoleRogue)
+	}
+	for i := 0; i < singularities; i++ {
+		roles = append(roles, secrethitler.RoleSingularity)
 	}
 	h.rng.Shuffle(len(roles), func(i, j int) { roles[i], roles[j] = roles[j], roles[i] })
 
@@ -203,18 +261,19 @@ func (h *GameHandler) dealRoles(ctx context.Context, game *models.Game, players 
 	// each player for their private reveal.
 	h.broadcast(ctx, models.NewGameEvent(game.GameID, secrethitler.EventRolesAssigned, ""), nil)
 
-	// Whisper to each player their private view. The team reveals:
+	// Whisper each player their private view. The reveal matrix:
 	//
-	//   Fascists    : always see every other fascist and Hitler.
+	//   AI cabal    : always see every other fascist and Hitler.
 	//   Hitler      : in 5-6 player games, sees the single fascist.
 	//                 In 7+ player games, sees nothing.
 	//   Liberals    : see nothing.
+	//   Singularity : sees nothing; plays alone by design.
 	for _, p := range players {
 		payload := RoleAssignedPayload{Role: p.Role, Party: p.Party}
 		switch p.Role {
-		case secrethitler.RoleFascist:
+		case secrethitler.RoleAI:
 			payload.Teammates = cabalViewExcluding(players, p.PlayerID)
-		case secrethitler.RoleHitler:
+		case secrethitler.RoleRogue:
 			if len(players) <= 6 {
 				payload.Teammates = cabalViewExcluding(players, p.PlayerID)
 			}
@@ -225,6 +284,17 @@ func (h *GameHandler) dealRoles(ctx context.Context, game *models.Game, players 
 	return nil
 }
 
+// rolesSeating picks the role-distribution table to use based on the
+// ruleset and returns the per-role seat counts. The Singularity column
+// is always zero for the vanilla path.
+func rolesSeating(game *models.Game, playerCount int) (liberals, fascists, hitlers, singularities int, ok bool) {
+	if game.Rules.EnableSingularity {
+		return secrethitler.RoleDistributionWithSingularity(playerCount)
+	}
+	l, f, h, ok := secrethitler.RoleDistribution(playerCount)
+	return l, f, h, 0, ok
+}
+
 // cabalViewExcluding returns the list of fascist-aligned players (fascists
 // and Hitler) excluding the player whose private view we're building.
 func cabalViewExcluding(players []*models.Player, selfPlayerID string) []TeammateInfo {
@@ -233,7 +303,7 @@ func cabalViewExcluding(players []*models.Player, selfPlayerID string) []Teammat
 		if p.PlayerID == selfPlayerID {
 			continue
 		}
-		if p.Role == secrethitler.RoleFascist || p.Role == secrethitler.RoleHitler {
+		if p.Role == secrethitler.RoleAI || p.Role == secrethitler.RoleRogue {
 			out = append(out, TeammateInfo{
 				PlayerID:    p.PlayerID,
 				DisplayName: p.DisplayName,

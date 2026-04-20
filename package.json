@@ -1,0 +1,14 @@
+{
+  "name": "replicant",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev:host": "pnpm --filter @replicant/host dev",
+    "dev:mobile": "pnpm --filter @replicant/mobile dev",
+    "dev:apps": "pnpm --parallel --filter \"@replicant/host\" --filter \"@replicant/mobile\" dev",
+    "dev:server": "go run ./cmd/api",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r exec rm -rf .next dist node_modules"
+  }
+}

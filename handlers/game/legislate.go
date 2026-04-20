@@ -123,19 +123,19 @@ func (h *GameHandler) ChancellorEnact(ctx context.Context, gameID, chancellorPla
 // EnactedPolicy record, emits events, and decides the next phase.
 // topDeck=true signals this enactment came from the election tracker.
 func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game, gov *models.Government, players []*models.Player, policy secrethitler.PolicyType, topDeck bool) error {
-	if policy == secrethitler.PolicyLiberal {
-		game.LiberalPoliciesEnacted++
+	if policy == secrethitler.PolicyHuman {
+		game.HumanPoliciesEnacted++
 	} else {
-		game.FascistPoliciesEnacted++
+		game.AIPoliciesEnacted++
 	}
-	if game.FascistPoliciesEnacted >= secrethitler.VetoUnlockThreshold {
+	if game.AIPoliciesEnacted >= game.Rules.VetoUnlockAt {
 		game.VetoUnlocked = true
 	}
 	// A successfully enacted policy (by government or by top-deck) clears
 	// the election tracker per rulebook.
 	game.ElectionTracker = 0
 
-	sequence := game.LiberalPoliciesEnacted + game.FascistPoliciesEnacted
+	sequence := game.HumanPoliciesEnacted + game.AIPoliciesEnacted
 	governmentID := ""
 	if gov != nil {
 		governmentID = gov.GovernmentID
@@ -149,8 +149,8 @@ func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game,
 		ev := models.NewGameEvent(game.GameID, secrethitler.EventTopDeckEnacted, "")
 		h.broadcast(ctx, ev, TopDeckPayload{
 			Policy:                 policy,
-			LiberalPoliciesEnacted: game.LiberalPoliciesEnacted,
-			FascistPoliciesEnacted: game.FascistPoliciesEnacted,
+			HumanPoliciesEnacted: game.HumanPoliciesEnacted,
+			AIPoliciesEnacted: game.AIPoliciesEnacted,
 		})
 	} else {
 		actor := ""
@@ -163,17 +163,17 @@ func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game,
 		h.broadcast(ctx, ev, ChancellorEnactedPayload{
 			GovernmentID:           governmentID,
 			Policy:                 policy,
-			LiberalPoliciesEnacted: game.LiberalPoliciesEnacted,
-			FascistPoliciesEnacted: game.FascistPoliciesEnacted,
+			HumanPoliciesEnacted: game.HumanPoliciesEnacted,
+			AIPoliciesEnacted: game.AIPoliciesEnacted,
 		})
 	}
 
 	// Check policy-based win conditions.
-	if game.LiberalPoliciesEnacted >= secrethitler.LiberalWinPolicyCount {
-		return h.endGame(ctx, game, secrethitler.PartyLiberal, secrethitler.WinLiberalPolicies)
+	if game.HumanPoliciesEnacted >= game.Rules.HumanPoliciesToWin {
+		return h.endGame(ctx, game, secrethitler.PartyHuman, secrethitler.WinHumanPolicies)
 	}
-	if game.FascistPoliciesEnacted >= secrethitler.FascistWinPolicyCount {
-		return h.endGame(ctx, game, secrethitler.PartyFascist, secrethitler.WinFascistPolicies)
+	if game.AIPoliciesEnacted >= game.Rules.AIPoliciesToWin {
+		return h.endGame(ctx, game, secrethitler.PartyAI, secrethitler.WinAIPolicies)
 	}
 
 	// Record term limits after a successful, non-topdeck enactment.
@@ -185,8 +185,8 @@ func (h *GameHandler) applyEnactedPolicy(ctx context.Context, game *models.Game,
 	}
 
 	// If a fascist policy was enacted (non-topdeck), check for a power.
-	if !topDeck && policy == secrethitler.PolicyFascist {
-		power := secrethitler.PowerFor(game.PlayerCount, game.FascistPoliciesEnacted)
+	if !topDeck && policy == secrethitler.PolicyAI {
+		power := secrethitler.PowerFor(game.PlayerCount, game.AIPoliciesEnacted)
 		if power != "" {
 			return h.enterExecutiveAction(ctx, game, gov, power)
 		}

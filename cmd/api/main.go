@@ -19,10 +19,17 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/cannonball10/foundation/api"
 	authconn "github.com/cannonball10/foundation/connectors/authentication"
 	"github.com/cannonball10/foundation/connectors/database"
+	"github.com/cannonball10/foundation/connectors/inference"
+	"github.com/cannonball10/foundation/connectors/tts"
+	"github.com/cannonball10/foundation/handlers/game"
+	"github.com/cannonball10/foundation/handlers/narrator"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -42,14 +49,20 @@ func main() {
 
 	auth := pickAuth(ctx)
 
+	simulate, simCfg := simulateOpts()
+	narr := buildNarrator(ctx)
 	server := api.NewServer(api.Options{
-		Database: db,
-		Auth:     auth,
-		GinMode:  ginMode(),
+		Database:         db,
+		Auth:             auth,
+		GinMode:          ginMode(),
+		SimulateOnCreate: simulate,
+		SimulateConfig:   simCfg,
+		AllowedOrigins:   parseCSV(os.Getenv("CORS_ALLOWED_ORIGINS")),
+		Narrator:         narr,
 	})
 
 	addr := ":" + envOr("API_PORT", "8080")
-	slog.Info("starting api", "addr", addr, "auth", authKind(auth))
+	slog.Info("starting api", "addr", addr, "auth", authKind(auth), "simulate", simulate)
 	if err := server.Run(addr); err != nil {
 		slog.Error("server exited", "err", err)
 		os.Exit(1)
@@ -88,4 +101,105 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// simulateOpts reads the SIMULATE_* env vars. When SIMULATE_ON_CREATE is
+// truthy, every successful CreateGame fires a bot-driven playthrough.
+//
+//	SIMULATE_ON_CREATE   "1"|"true"|"yes"  — enable
+//	SIMULATE_PLAYERS     int               — total seats incl. host (default 7, clamped to [5,10])
+//	SIMULATE_STEP_MS     int milliseconds  — pause between bot actions (default 1500)
+//	SIMULATE_START_MS    int milliseconds  — pause before first bot joins (default 2000)
+//	SIMULATE_SEED        uint64            — seeds bot RNG for reproducible demos
+//	SIMULATE_HUMAN_SEATS int               — seats reserved for real players; bots don't fill them
+//	                                         and the simulator waits for the host to press Start
+//	                                         (default 0 = fully autonomous demo)
+func simulateOpts() (bool, game.SimulationConfig) {
+	if !truthy(os.Getenv("SIMULATE_ON_CREATE")) {
+		return false, game.SimulationConfig{}
+	}
+	return true, game.SimulationConfig{
+		Players:    atoiOr("SIMULATE_PLAYERS", 0),
+		StepDelay:  msEnv("SIMULATE_STEP_MS"),
+		StartDelay: msEnv("SIMULATE_START_MS"),
+		Seed:       uint64(atoiOr("SIMULATE_SEED", 0)),
+		HumanSeats: atoiOr("SIMULATE_HUMAN_SEATS", 0),
+	}
+}
+
+func truthy(s string) bool {
+	switch s {
+	case "1", "true", "TRUE", "yes", "on":
+		return true
+	}
+	return false
+}
+
+func atoiOr(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+	return n
+}
+
+// buildNarrator constructs the Anthropic + ElevenLabs backed narrator
+// if BOTH credentials are present. Missing either one returns nil and
+// the server disables the /host/narrate endpoint; the host client
+// handles that gracefully by greying out the Speak button.
+func buildNarrator(ctx context.Context) *narrator.Narrator {
+	if os.Getenv("ANTHROPIC_API_KEY") == "" {
+		slog.Info("narrator disabled: ANTHROPIC_API_KEY not set")
+		return nil
+	}
+	if os.Getenv("ELEVENLABS_API_KEY") == "" {
+		slog.Info("narrator disabled: ELEVENLABS_API_KEY not set")
+		return nil
+	}
+	infer, err := inference.DefaultAnthropicTextInference(ctx)
+	if err != nil {
+		slog.Warn("narrator init (anthropic) failed", "err", err)
+		return nil
+	}
+	ttsConn, err := tts.DefaultElevenLabsConnector(ctx)
+	if err != nil {
+		slog.Warn("narrator init (elevenlabs) failed", "err", err)
+		return nil
+	}
+	cfg := narrator.Config{
+		Model:    envOr("NARRATOR_MODEL", "claude-sonnet-4-6"),
+		VoiceID:  os.Getenv("ELEVENLABS_VOICE_ID"),
+		TTSModel: envOr("ELEVENLABS_MODEL_ID", "eleven_turbo_v2_5"),
+	}
+	slog.Info("narrator ready", "model", cfg.Model, "voice", cfg.VoiceID)
+	return narrator.New(infer, ttsConn, cfg)
+}
+
+// parseCSV splits an env value like "http://a.com, http://b.com" into a
+// trimmed slice. Empty input returns nil so AllowedOrigins stays empty
+// and the CORS middleware isn't registered at all.
+func parseCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func msEnv(key string) time.Duration {
+	n := atoiOr(key, 0)
+	if n <= 0 {
+		return 0
+	}
+	return time.Duration(n) * time.Millisecond
 }

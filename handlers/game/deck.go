@@ -7,15 +7,17 @@ import (
 	"github.com/cannonball10/foundation/schemas/secrethitler"
 )
 
-// initDeck builds a fresh 17-card deck (6 liberal, 11 fascist) and
-// shuffles it in place with the engine's RNG.
+// initDeck builds a fresh deck per the game's RulesConfig (6 human / 11
+// AI in the vanilla ruleset) and shuffles it in place with the engine's
+// RNG.
 func (h *GameHandler) initDeck(g *models.Game) {
-	deck := make([]secrethitler.PolicyType, 0, secrethitler.LiberalPoliciesInDeck+secrethitler.FascistPoliciesInDeck)
-	for i := 0; i < secrethitler.LiberalPoliciesInDeck; i++ {
-		deck = append(deck, secrethitler.PolicyLiberal)
+	total := g.Rules.HumanProtocolsInDeck + g.Rules.AIProtocolsInDeck
+	deck := make([]secrethitler.PolicyType, 0, total)
+	for i := 0; i < g.Rules.HumanProtocolsInDeck; i++ {
+		deck = append(deck, secrethitler.PolicyHuman)
 	}
-	for i := 0; i < secrethitler.FascistPoliciesInDeck; i++ {
-		deck = append(deck, secrethitler.PolicyFascist)
+	for i := 0; i < g.Rules.AIProtocolsInDeck; i++ {
+		deck = append(deck, secrethitler.PolicyAI)
 	}
 	h.rng.Shuffle(len(deck), func(i, j int) { deck[i], deck[j] = deck[j], deck[i] })
 	g.DrawPile = deck

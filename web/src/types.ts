@@ -3,9 +3,9 @@
 
 // ─── enums ──────────────────────────────────────────────────────────
 
-export type Role = "liberal" | "fascist" | "hitler";
-export type Party = "liberal" | "fascist";
-export type PolicyType = "liberal" | "fascist";
+export type Role = "human" | "ai" | "rogue";
+export type Party = "human" | "ai";
+export type PolicyType = "human" | "ai";
 
 export type GameStatus = "lobby" | "in_progress" | "completed" | "abandoned";
 
@@ -36,10 +36,10 @@ export type ExecutiveActionType =
   | "top_deck";
 
 export type WinCondition =
-  | "liberal_policies"
-  | "fascist_policies"
-  | "hitler_elected_chancellor"
-  | "hitler_executed";
+  | "human_policies"
+  | "ai_policies"
+  | "rogue_elected_chancellor"
+  | "rogue_executed";
 
 export type EventType =
   | "game_created"
@@ -84,8 +84,8 @@ export interface Game extends Timestamps {
   previousChancellorSeat?: number | null;
   specialElectionReturnSeat?: number | null;
   currentGovernmentId?: string;
-  liberalPoliciesEnacted: number;
-  fascistPoliciesEnacted: number;
+  humanPoliciesEnacted: number;
+  aiPoliciesEnacted: number;
   electionTracker: number;
   vetoUnlocked: boolean;
   playerCount: number;
@@ -192,6 +192,7 @@ export interface PlayerJoinedPayload {
 export interface GameStartedPayload {
   playerCount: number;
   initialPresidentSeat: number;
+  round: number;
 }
 
 export interface TeammateInfo {
@@ -211,6 +212,7 @@ export interface ChancellorNominatedPayload {
   chancellorPlayerId: string;
   governmentId: string;
   deadline?: string;
+  round: number;
 }
 
 export interface VoteCastPayload {
@@ -240,8 +242,8 @@ export interface PresidentDiscardedPayload {
 export interface ChancellorEnactedPayload {
   governmentId: string;
   policy: PolicyType;
-  liberalPoliciesEnacted: number;
-  fascistPoliciesEnacted: number;
+  humanPoliciesEnacted: number;
+  aiPoliciesEnacted: number;
 }
 
 export interface VetoProposedPayload {
@@ -285,8 +287,8 @@ export interface ElectionTrackerPayload {
 
 export interface TopDeckPayload {
   policy: PolicyType;
-  liberalPoliciesEnacted: number;
-  fascistPoliciesEnacted: number;
+  humanPoliciesEnacted: number;
+  aiPoliciesEnacted: number;
 }
 
 export interface DeckReshuffledPayload {
@@ -295,7 +297,7 @@ export interface DeckReshuffledPayload {
 
 export interface PlayerExecutedPayload {
   playerId: string;
-  wasHitler: boolean;
+  wasRogue: boolean;
   executedBySeat: number;
 }
 

@@ -1,0 +1,153 @@
+/* ─────────────────────────────────────────────────────────────
+   REPLICANT — DESIGN TOKENS
+   Dystopian Corporate. Bureaucratic beige. Stamp-red. Terminal cyan.
+   ───────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@400;500;600;700&family=Special+Elite&display=swap');
+
+:root {
+  /* ── PAPER & INK ─────────────────────────────────── */
+  --paper:          #E8DFC9;   /* aged manila */
+  --paper-2:        #D9CFB5;   /* carbon-copy pink-beige */
+  --paper-3:        #F2EAD3;   /* bright memo */
+  --paper-line:     #B8AE93;   /* ruled line */
+  --ink:            #1C1A15;   /* carbon ribbon black */
+  --ink-soft:       #3A352A;   /* typewriter stroke */
+  --ink-faded:      #6B6450;   /* ghosted copy */
+
+  /* ── DEPARTMENT BROADCAST (HOST TV) ──────────────── */
+  --broadcast:      #12120E;   /* deep terminal black */
+  --broadcast-2:    #1E1D17;   /* panel */
+  --broadcast-rule: #3A3A2E;   /* hairline */
+
+  /* ── STAMPS & ACCENTS ────────────────────────────── */
+  --stamp-red:      #B32724;   /* "OFFICIAL" ink */
+  --stamp-red-2:    #8E1A18;
+  --stamp-green:    #3F6B3A;   /* APPROVED */
+  --stamp-blue:     #24426B;   /* PROCESSED */
+  --cyan:           #5FD3CC;   /* machine signal */
+  --cyan-soft:      #2A6E6A;
+  --amber:          #D69E2E;   /* caution */
+
+  /* ── TYPE ────────────────────────────────────────── */
+  --font-display:   'Oswald', 'Impact', sans-serif;
+  --font-sans:      'Inter Tight', -apple-system, 'Helvetica Neue', sans-serif;
+  --font-mono:      'JetBrains Mono', 'Courier New', monospace;
+  --font-typewriter:'Special Elite', 'Courier New', monospace;
+
+  /* ── SHADOW & ELEVATION ──────────────────────────── */
+  --shadow-paper:   0 1px 0 rgba(0,0,0,0.04), 0 2px 6px rgba(60,50,30,0.18), 0 12px 24px rgba(60,50,30,0.08);
+  --shadow-stack:   0 1px 0 rgba(0,0,0,0.04), 0 2px 4px rgba(60,50,30,0.12), 4px 6px 0 rgba(60,50,30,0.08), 8px 12px 20px rgba(60,50,30,0.12);
+
+  /* ── SPACING ─────────────────────────────────────── */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
+}
+
+/* ── PAPER TEXTURE (shared by all "paper" surfaces) ── */
+.paper-tex {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(0,0,0,0.04), transparent 60%),
+    radial-gradient(ellipse at 80% 90%, rgba(0,0,0,0.05), transparent 60%),
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.012) 2px 3px),
+    repeating-linear-gradient(90deg, transparent 0 2px, rgba(0,0,0,0.012) 2px 3px);
+}
+.paper-tex-2 { background-color: var(--paper-2); }
+.paper-tex-3 { background-color: var(--paper-3); }
+
+.broadcast-tex {
+  background-color: var(--broadcast);
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,0.015) 3px 4px),
+    radial-gradient(ellipse at center, rgba(95,211,204,0.04), transparent 70%);
+}
+
+/* perforated edge (triplicate form tear-off) */
+.perf-top {
+  background-image: radial-gradient(circle at 6px 0, transparent 3px, currentColor 3.5px);
+  background-size: 12px 6px;
+  background-repeat: repeat-x;
+  height: 6px;
+  color: var(--paper);
+}
+
+/* ── TYPOGRAPHY UTILITIES ──────────────────── */
+.t-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.t-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.t-memo {
+  font-family: var(--font-typewriter);
+  letter-spacing: 0.01em;
+}
+
+/* redaction bar */
+.redacted {
+  background: var(--ink);
+  color: var(--ink) !important;
+  user-select: none;
+  padding: 0 4px;
+  box-shadow: 0 0 0 0.5px var(--ink);
+}
+
+/* official stamp */
+.stamp {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--stamp-red);
+  border: 3px solid var(--stamp-red);
+  padding: 6px 14px 4px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+  opacity: 0.88;
+  mix-blend-mode: multiply;
+  position: relative;
+}
+.stamp::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 30% 40%, transparent 1.2px, rgba(232,223,201,0.6) 1.5px, transparent 2px),
+    radial-gradient(circle at 70% 60%, transparent 1px, rgba(232,223,201,0.4) 1.3px, transparent 1.8px);
+  background-size: 7px 7px, 5px 5px;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.stamp--green { color: var(--stamp-green); border-color: var(--stamp-green); }
+.stamp--blue  { color: var(--stamp-blue);  border-color: var(--stamp-blue); }
+
+/* scanlines (for host TV) */
+.scanlines {
+  position: relative;
+}
+.scanlines::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,0.25) 2px 3px);
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+}
+
+/* ─── ANIMATIONS ─── */
+@keyframes blink    { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+@keyframes stampIn  { 0%{transform:rotate(-6deg) scale(3); opacity:0} 70%{transform:rotate(-6deg) scale(0.9); opacity:1} 85%{transform:rotate(-6deg) scale(1.05)} 100%{transform:rotate(-6deg) scale(1); opacity:0.88} }
+@keyframes tickerFeed { from{transform:translateX(100%)} to{transform:translateX(-100%)} }
+@keyframes flicker  { 0%,100%{opacity:1} 50%{opacity:0.94} 52%{opacity:0.7} 54%{opacity:0.96} }
+
+.animate-blink  { animation: blink 1s step-end infinite; }
+.animate-stamp  { animation: stampIn 0.6s cubic-bezier(.2,1.2,.4,1) both; }
+.animate-flicker{ animation: flicker 4s infinite; }
+
+html, body { margin: 0; padding: 0; }
+* { box-sizing: border-box; }

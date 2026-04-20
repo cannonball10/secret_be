@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -13,9 +14,12 @@ import (
 
 // --- request/response bodies -----------------------------------------------
 
+// createGameReq is the POST /api/v1/games body. Both fields are
+// optional: an empty JoinCode triggers server-side generation, and an
+// empty DisplayName creates a board-only lobby (host is a spectator).
 type createGameReq struct {
-	JoinCode    string `json:"joinCode" binding:"required"`
-	DisplayName string `json:"displayName" binding:"required"`
+	JoinCode    string `json:"joinCode"`
+	DisplayName string `json:"displayName"`
 }
 
 type joinGameReq struct {
@@ -47,6 +51,11 @@ type executeActionReq struct {
 	TargetPlayerID string `json:"targetPlayerId" binding:"required"`
 }
 
+type chatReq struct {
+	Channel string `json:"channel" binding:"required"`
+	Body    string `json:"body" binding:"required"`
+}
+
 // --- lobby -----------------------------------------------------------------
 
 func (s *Server) handleCreateGame(c *gin.Context) {
@@ -55,12 +64,18 @@ func (s *Server) handleCreateGame(c *gin.Context) {
 		badRequest(c, err)
 		return
 	}
-	game, host, err := s.engine.CreateGame(c.Request.Context(), userID(c), body.JoinCode, body.DisplayName)
+	g, host, err := s.engine.CreateGame(c.Request.Context(), userID(c), body.JoinCode, body.DisplayName)
 	if err != nil {
 		writeEngineError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"game": game, "player": host})
+	// Dev-only autopilot: spin up bot players and play the game through
+	// so the board device shows a full end-to-end demo. Uses a detached
+	// context so the request finishing doesn't cancel the simulation.
+	if s.simulate {
+		go s.engine.SimulateGame(context.Background(), g.GameID, s.simConfig)
+	}
+	c.JSON(http.StatusCreated, gin.H{"game": g, "player": host})
 }
 
 func (s *Server) handleJoinGame(c *gin.Context) {
@@ -74,7 +89,27 @@ func (s *Server) handleJoinGame(c *gin.Context) {
 		writeEngineError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"game": g, "player": player})
+	// Return the full seat list so the joining device has a complete
+	// lobby snapshot immediately. Without this, the player only sees
+	// themselves until SSE envelopes trickle in — and MemoryHub doesn't
+	// replay, so any players who joined before the SSE opened would be
+	// invisible forever. Roles are scrubbed for everyone except the
+	// caller's own row (they'll receive their private role via whisper
+	// when the game starts, if it hasn't already).
+	roster, err := s.loadPlayers(c, g.GameID)
+	if err != nil {
+		return
+	}
+	if g.Status != secrethitler.GameStatusCompleted {
+		for _, p := range roster {
+			if p.PlayerID == player.PlayerID {
+				continue
+			}
+			p.Role = ""
+			p.Party = ""
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"game": g, "player": player, "players": roster})
 }
 
 func (s *Server) handleGetGame(c *gin.Context) {
@@ -243,6 +278,24 @@ func (s *Server) handleResolveVeto(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusAccepted, gin.H{"status": "veto resolved"})
+}
+
+func (s *Server) handleChatSend(c *gin.Context) {
+	var body chatReq
+	if err := c.ShouldBindJSON(&body); err != nil {
+		badRequest(c, err)
+		return
+	}
+	gameID := c.Param("gameId")
+	player, err := s.currentPlayer(c, gameID)
+	if err != nil {
+		return
+	}
+	if err := s.engine.SendChat(c.Request.Context(), gameID, player.PlayerID, game.ChatChannel(body.Channel), body.Body); err != nil {
+		writeEngineError(c, err)
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"status": "sent"})
 }
 
 func (s *Server) handleExecuteAction(c *gin.Context) {

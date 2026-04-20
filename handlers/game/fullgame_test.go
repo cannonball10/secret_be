@@ -155,7 +155,7 @@ func summarize(g *models.Game) string {
 	return fmt.Sprintf(
 		"round=%d phase=%s pres=%d lib=%d fasc=%d tracker=%d prevP=%s prevC=%s",
 		g.Round, g.Phase, g.PresidentSeat,
-		g.LiberalPoliciesEnacted, g.FascistPoliciesEnacted,
+		g.HumanPoliciesEnacted, g.AIPoliciesEnacted,
 		g.ElectionTracker, prevP, prevC,
 	)
 }
@@ -177,13 +177,13 @@ func TestFullGameLoop_EndsInWin(t *testing.T) {
 	if final.Winner == "" || final.WinCondition == "" {
 		t.Errorf("expected winner and condition, got winner=%q cond=%q", final.Winner, final.WinCondition)
 	}
-	total := final.LiberalPoliciesEnacted + final.FascistPoliciesEnacted
+	total := final.HumanPoliciesEnacted + final.AIPoliciesEnacted
 	if total == 0 {
 		t.Errorf("no policies enacted; bad game state")
 	}
 	t.Logf("winner=%s condition=%s liberal=%d fascist=%d rounds=%d",
 		final.Winner, final.WinCondition,
-		final.LiberalPoliciesEnacted, final.FascistPoliciesEnacted,
+		final.HumanPoliciesEnacted, final.AIPoliciesEnacted,
 		final.Round)
 }
 
@@ -413,7 +413,7 @@ func TestFullGameLoop_AcceptVetoes(t *testing.T) {
 
 // TestFullGameLoop_HitlerExecutedEndsGame plays a 7-player game where
 // once Execution power triggers, the president always targets Hitler,
-// and asserts the game ends with WinHitlerExecuted.
+// and asserts the game ends with WinRogueExecuted.
 func TestFullGameLoop_HitlerExecutedEndsGame(t *testing.T) {
 	h, _, _, _ := newTestHandler(t, 77)
 	g := seedLobby(t, h, 7)
@@ -425,7 +425,7 @@ func TestFullGameLoop_HitlerExecutedEndsGame(t *testing.T) {
 	var hitler *models.Player
 	players, _ := h.loadPlayers(ctx, g.GameID)
 	for _, p := range players {
-		if p.IsHitler() {
+		if p.IsRogue() {
 			hitler = p
 			break
 		}
@@ -437,7 +437,7 @@ func TestFullGameLoop_HitlerExecutedEndsGame(t *testing.T) {
 	for step := 0; step < 500; step++ {
 		game, _ := h.loadGame(ctx, g.GameID)
 		if game.Status == secrethitler.GameStatusCompleted {
-			if game.WinCondition != secrethitler.WinHitlerExecuted {
+			if game.WinCondition != secrethitler.WinRogueExecuted {
 				t.Logf("game ended before Hitler execution: %s (winner=%s)", game.WinCondition, game.Winner)
 			}
 			return
@@ -556,5 +556,5 @@ func TestFullGameLoop_ForcesTopDeck(t *testing.T) {
 		t.Error("expected at least one top-deck event")
 	}
 	t.Logf("top-deck enactments: %d winner=%s liberal=%d fascist=%d",
-		topDecks, final.Winner, final.LiberalPoliciesEnacted, final.FascistPoliciesEnacted)
+		topDecks, final.Winner, final.HumanPoliciesEnacted, final.AIPoliciesEnacted)
 }

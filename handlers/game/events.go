@@ -39,6 +39,7 @@ type PlayerJoinedPayload struct {
 type GameStartedPayload struct {
 	PlayerCount          int `json:"playerCount"`
 	InitialPresidentSeat int `json:"initialPresidentSeat"`
+	Round                int `json:"round"`
 }
 
 // RoleAssignedPayload is whispered individually to each player so they
@@ -58,12 +59,15 @@ type TeammateInfo struct {
 	Role        secrethitler.Role `json:"role"`
 }
 
-// ChancellorNominatedPayload accompanies a chancellor nomination.
+// ChancellorNominatedPayload accompanies a chancellor nomination. Round
+// is included so clients can display the round counter without fetching
+// the full game snapshot; it changes exactly when a new round begins.
 type ChancellorNominatedPayload struct {
 	PresidentPlayerID  string `json:"presidentPlayerId"`
 	ChancellorPlayerID string `json:"chancellorPlayerId"`
 	GovernmentID       string `json:"governmentId"`
 	Deadline           string `json:"deadline,omitempty"` // RFC3339
+	Round              int    `json:"round"`
 }
 
 // VoteCastPayload is broadcast when a player votes. The choice is NOT
@@ -102,8 +106,8 @@ type PresidentDiscardedPayload struct {
 type ChancellorEnactedPayload struct {
 	GovernmentID           string                  `json:"governmentId"`
 	Policy                 secrethitler.PolicyType `json:"policy"`
-	LiberalPoliciesEnacted int                     `json:"liberalPoliciesEnacted"`
-	FascistPoliciesEnacted int                     `json:"fascistPoliciesEnacted"`
+	HumanPoliciesEnacted int                     `json:"humanPoliciesEnacted"`
+	AIPoliciesEnacted int                     `json:"aiPoliciesEnacted"`
 }
 
 // VetoProposedPayload announces the chancellor requested a veto.
@@ -150,8 +154,8 @@ type ElectionTrackerPayload struct {
 // TopDeckPayload announces a policy enacted by election-tracker advance.
 type TopDeckPayload struct {
 	Policy                 secrethitler.PolicyType `json:"policy"`
-	LiberalPoliciesEnacted int                     `json:"liberalPoliciesEnacted"`
-	FascistPoliciesEnacted int                     `json:"fascistPoliciesEnacted"`
+	HumanPoliciesEnacted int                     `json:"humanPoliciesEnacted"`
+	AIPoliciesEnacted int                     `json:"aiPoliciesEnacted"`
 }
 
 // DeckReshuffledPayload announces the draw+discard piles were combined
@@ -164,7 +168,7 @@ type DeckReshuffledPayload struct {
 // Execution power.
 type PlayerExecutedPayload struct {
 	PlayerID       string `json:"playerId"`
-	WasHitler      bool   `json:"wasHitler"`
+	WasRogue      bool   `json:"wasRogue"`
 	ExecutedBySeat int    `json:"executedBySeat"`
 }
 
@@ -174,13 +178,70 @@ type GameEndedPayload struct {
 	WinCondition secrethitler.WinCondition `json:"winCondition"`
 }
 
+// NarratorSpeakPayload carries a synthesised narrator utterance. The
+// Department "speaks" over a game-wide broadcast envelope; host
+// devices play AudioURL (a data-URL embedding the MP3) and render
+// Script as typewriter text. Mobile clients can optionally render the
+// transcript without playing audio.
+type NarratorSpeakPayload struct {
+	CueID    string `json:"cueId"`
+	Cue      string `json:"cue"`
+	Script   string `json:"script"`
+	AudioURL string `json:"audioUrl"`
+	AudioID  string `json:"audioId"`
+	Format   string `json:"format"`
+	TookMS   int64  `json:"tookMs"`
+}
+
+// CablePhaseOpenedPayload announces the start of a Cable Phase. The
+// deadline is the phase's absolute cutoff in RFC3339 — clients render
+// a countdown from (deadline - now). Chat send controls should become
+// live on receipt and lock again on cable_phase_closed.
+type CablePhaseOpenedPayload struct {
+	GovernmentID string `json:"governmentId"`
+	Deadline     string `json:"deadline"`
+}
+
+// CablePhaseClosedPayload announces the end of a Cable Phase. Reason
+// mirrors ProgressReason (timeout / forced / all_voted-equivalent).
+// LeakedMessageID references the cable (if any) the Department chose
+// to broadcast; empty when the Department went silent or no cables
+// were submitted.
+type CablePhaseClosedPayload struct {
+	GovernmentID     string         `json:"governmentId"`
+	Reason           ProgressReason `json:"reason"`
+	LeakedMessageID  string         `json:"leakedMessageId,omitempty"`
+	TotalSubmissions int            `json:"totalSubmissions"`
+}
+
+// CableLeakedPayload carries the full body of the cable the narrator
+// just broadcast — including a flag indicating whether the Department
+// chose silence instead of a leak. When Silenced is true, Body and
+// Author are empty; the narrator_speak envelope fired alongside
+// announces the silence verbally.
+type CableLeakedPayload struct {
+	GovernmentID    string  `json:"governmentId"`
+	Silenced        bool    `json:"silenced"`
+	MessageID       string  `json:"messageId,omitempty"`
+	AuthorPlayerID  string  `json:"authorPlayerId,omitempty"`
+	Author          string  `json:"author,omitempty"`
+	Body            string  `json:"body,omitempty"`
+	SubversionScore float64 `json:"subversionScore,omitempty"`
+}
+
 // PhaseChangedPayload is emitted on every phase transition so clients
 // can drive their UI from a single event stream. It pairs nicely with
 // more specific events (e.g. ChancellorNominatedPayload) but stands on
 // its own when the engine is advanced by a timer or host action.
+//
+// PresidentSeat is the CURRENT president at the time of the transition.
+// Clients use it to recover the seat after rotation (normal round
+// rollover) and after a Special Election, neither of which carry a
+// dedicated "president changed" event.
 type PhaseChangedPayload struct {
-	From     secrethitler.GamePhase `json:"from"`
-	To       secrethitler.GamePhase `json:"to"`
-	Reason   ProgressReason         `json:"reason"`
-	Deadline string                 `json:"deadline,omitempty"` // RFC3339
+	From          secrethitler.GamePhase `json:"from"`
+	To            secrethitler.GamePhase `json:"to"`
+	Reason        ProgressReason         `json:"reason"`
+	Deadline      string                 `json:"deadline,omitempty"` // RFC3339
+	PresidentSeat int                    `json:"presidentSeat"`
 }

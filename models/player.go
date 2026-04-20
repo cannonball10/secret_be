@@ -43,6 +43,15 @@ type Player struct {
 	IsAlive     bool `json:"isAlive"`
 	IsConnected bool `json:"isConnected"`
 
+	// Country is the world-power delegation this player represents on
+	// the Earth Policy Committee. Assigned at StartGame from a rotating
+	// pool keyed on seat so every table has a distinct set. CountryCode
+	// is the ISO-3166-1 alpha-2 code used for the passport stamp UI;
+	// CountryName is the full display string. Both are empty while the
+	// lobby is still accepting joins.
+	CountryCode string `json:"countryCode,omitempty"`
+	CountryName string `json:"countryName,omitempty"`
+
 	// InvestigatedBySeats tracks which player seats have already used an
 	// Investigate Loyalty power on this player, so a given investigator
 	// cannot investigate the same target twice in the same game.
@@ -90,9 +99,15 @@ func (p *Player) Kill() {
 	p.Touch()
 }
 
-// IsHitler returns true if this player was assigned the Hitler role.
-func (p *Player) IsHitler() bool {
-	return p.Role == secrethitler.RoleHitler
+// IsRogue returns true if this player was assigned the Hitler role.
+func (p *Player) IsRogue() bool {
+	return p.Role == secrethitler.RoleRogue
+}
+
+// IsSingularity returns true if this player was assigned the
+// Singularity role (only dealt when Rules.EnableSingularity is on).
+func (p *Player) IsSingularity() bool {
+	return p.Role == secrethitler.RoleSingularity
 }
 
 // MarkInvestigatedBy records that the given investigator seat has now

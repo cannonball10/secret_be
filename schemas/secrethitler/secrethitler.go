@@ -2,36 +2,52 @@
 package secrethitler
 
 // Role is a player's secret role assigned at game start.
+//
+// Naming is retained from the Secret Hitler origin (Human / AI / Rogue)
+// even as the Replicant theme renames them in-fiction to Human /
+// Replicant / Prime. A fourth role, Singularity, is only dealt when
+// RulesConfig.EnableSingularity is true — it's a solo kingmaker
+// faction (see PartyFor and the WinSingularityKingmaker condition).
 type Role string
 
 const (
-	RoleLiberal Role = "liberal"
-	RoleFascist Role = "fascist"
-	RoleHitler  Role = "hitler"
+	RoleHuman       Role = "human"
+	RoleAI          Role = "ai"          // in-fiction: Replicant
+	RoleRogue       Role = "rogue"       // in-fiction: Prime
+	RoleSingularity Role = "singularity" // solo faction; opt-in via rules
 )
 
-// Party is a player's public party membership (Hitler's party is Fascist).
+// Party is a player's faction alignment. The three-faction variant
+// (Singularity) is only reachable when the ruleset enables it; vanilla
+// games stay in the original 2-faction model.
 type Party string
 
 const (
-	PartyLiberal Party = "liberal"
-	PartyFascist Party = "fascist"
+	PartyHuman       Party = "human"
+	PartyAI          Party = "ai" // in-fiction: Replicant cabal
+	PartySingularity Party = "singularity"
 )
 
-// PartyFor returns the party alignment for a given role.
+// PartyFor returns the party alignment for a given role. Singularity
+// is its own faction — it is not aligned with either the humans or
+// the AI cabal, and wins alone under the kingmaker condition.
 func PartyFor(r Role) Party {
-	if r == RoleLiberal {
-		return PartyLiberal
+	switch r {
+	case RoleHuman:
+		return PartyHuman
+	case RoleSingularity:
+		return PartySingularity
+	default:
+		return PartyAI
 	}
-	return PartyFascist
 }
 
 // PolicyType is the type of a policy card.
 type PolicyType string
 
 const (
-	PolicyLiberal PolicyType = "liberal"
-	PolicyFascist PolicyType = "fascist"
+	PolicyHuman PolicyType = "human"
+	PolicyAI PolicyType = "ai"
 )
 
 // Standard deck composition for Secret Hitler.
@@ -40,12 +56,12 @@ const (
 	FascistPoliciesInDeck = 11
 
 	// Enacted-policy thresholds for win conditions.
-	LiberalWinPolicyCount = 5
-	FascistWinPolicyCount = 6
+	HumanWinPolicyCount = 5
+	AIWinPolicyCount = 6
 
 	// Fascist policies enacted threshold after which electing Hitler
 	// as Chancellor results in a fascist victory.
-	HitlerChancellorThreshold = 3
+	RogueChancellorThreshold = 3
 
 	// Election tracker limit: after 3 failed elections the top policy
 	// is enacted automatically and term limits reset.
@@ -72,12 +88,29 @@ type GamePhase string
 const (
 	PhaseLobby                 GamePhase = "lobby"
 	PhaseNomination            GamePhase = "nomination"
+	PhaseCablePhase            GamePhase = "cable_phase"
 	PhaseElection              GamePhase = "election"
 	PhaseLegislativePresident  GamePhase = "legislative_president"
 	PhaseLegislativeChancellor GamePhase = "legislative_chancellor"
 	PhaseVetoRequested         GamePhase = "veto_requested"
 	PhaseExecutiveAction       GamePhase = "executive_action"
 	PhaseGameOver              GamePhase = "game_over"
+)
+
+// CablePhaseMode controls when the Cable Phase interstitial runs
+// between nomination and election. Set on RulesConfig.
+type CablePhaseMode string
+
+const (
+	// CableModeDisabled skips the phase entirely (vanilla Secret
+	// Hitler flow: nomination → election directly).
+	CableModeDisabled CablePhaseMode = "disabled"
+	// CableModeEveryRound inserts a Cable Phase after every
+	// chancellor nomination.
+	CableModeEveryRound CablePhaseMode = "every_round"
+	// CableModeOnActivation inserts a Cable Phase only when a power
+	// activates it — e.g. a Wiretap. Reserved for future work.
+	CableModeOnActivation CablePhaseMode = "on_activation"
 )
 
 // VoteChoice is a player's vote on a proposed government.
@@ -116,10 +149,11 @@ const (
 type WinCondition string
 
 const (
-	WinLiberalPolicies WinCondition = "liberal_policies"
-	WinFascistPolicies WinCondition = "fascist_policies"
-	WinHitlerElected   WinCondition = "hitler_elected_chancellor"
-	WinHitlerExecuted  WinCondition = "hitler_executed"
+	WinHumanPolicies        WinCondition = "human_policies"
+	WinAIPolicies           WinCondition = "ai_policies"
+	WinRogueElected         WinCondition = "rogue_elected_chancellor"
+	WinRogueExecuted        WinCondition = "rogue_executed"
+	WinSingularityKingmaker WinCondition = "singularity_kingmaker"
 )
 
 // EventType identifies entries in the game event log.
@@ -145,4 +179,9 @@ const (
 	EventDeckReshuffled      EventType = "deck_reshuffled"
 	EventPlayerExecuted      EventType = "player_executed"
 	EventGameEnded           EventType = "game_ended"
+	EventChatMessage         EventType = "chat_message"
+	EventNarratorSpeak       EventType = "narrator_speak"
+	EventCablePhaseOpened    EventType = "cable_phase_opened"
+	EventCablePhaseClosed    EventType = "cable_phase_closed"
+	EventCableLeaked         EventType = "cable_leaked"
 )

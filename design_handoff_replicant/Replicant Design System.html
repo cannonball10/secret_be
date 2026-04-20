@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Replicant — Design System</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { background: #f0eee9; overflow: hidden; }
+  .tv-shell { width: 1280px; height: 720px; box-shadow: 0 0 0 12px #111, 0 30px 80px rgba(0,0,0,0.3); }
+  .swatch { width:120px; height:120px; display:flex; flex-direction:column; justify-content:flex-end; padding:10px; font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.08em; }
+  .token-row { display:flex; align-items:center; gap:18px; padding:12px 14px; border-bottom:1px dashed #B8AE93; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="host-screens.jsx"></script>
+<script type="text/babel" src="mobile-screens.jsx"></script>
+
+<script type="text/babel">
+const { DesignCanvas, DCSection, DCArtboard, DCPostIt } = window;
+
+// Host TV artboard: 1280x720 scaled display of a 1920x1080 canvas
+function TVBoard({ children, label, width=1280, height=720 }) {
+  const scale = width/1920;
+  return (
+    <DCArtboard label={label} width={width} height={height} style={{ background:'#111', padding:0, borderRadius:6, boxShadow:'0 0 0 10px #0a0a0a, 0 20px 40px rgba(0,0,0,0.25)' }}>
+      <div style={{ width:1920, height:1080, transform:`scale(${scale})`, transformOrigin:'0 0', position:'relative' }}>
+        {children}
+      </div>
+    </DCArtboard>
+  );
+}
+
+function Swatch({ color, name, token, on='#1C1A15' }) {
+  return (
+    <div className="swatch" style={{ background:color, color: on }}>
+      <div style={{ fontWeight:700, letterSpacing:'0.12em' }}>{name}</div>
+      <div style={{ opacity:0.7 }}>{token}</div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <DesignCanvas>
+      {/* BRAND IDENTITY */}
+      <DCSection title="01 · Brand Identity" subtitle="REPLICANT — a bureaucratic social-deduction game. Humans vs AI, processed as paperwork.">
+        <DCArtboard label="Wordmark — primary" width={720} height={360} style={{ background:rpColors.paper, padding:'60px 48px' }}>
+          <div className="paper-tex" style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', justifyContent:'center', padding:30 }}>
+            <div className="t-eyebrow" style={{ color:rpColors.inkFaded, marginBottom:14 }}>◼ DEPT. OF HUMAN AFFAIRS · FORM R-07</div>
+            <RPWordmark size={140} />
+            <div className="t-memo" style={{ color:rpColors.inkSoft, marginTop:14, fontSize:16 }}>A Human Verification Procedure, in Eight Rounds.</div>
+          </div>
+        </DCArtboard>
+        <DCArtboard label="Wordmark — inverted" width={720} height={360} style={{ background:rpColors.broadcast, padding:0 }}>
+          <div className="broadcast-tex scanlines" style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', justifyContent:'center', padding:40 }}>
+            <div className="t-eyebrow" style={{ color:rpColors.cyan, marginBottom:14 }}>▸ BROADCAST SIGNATURE</div>
+            <RPWordmark size={140} color={rpColors.paper3} ghost={rpColors.cyan} />
+            <div className="t-memo" style={{ color:rpColors.paper3, marginTop:14, fontSize:16, opacity:0.7 }}>Live from Node 04-7.</div>
+          </div>
+        </DCArtboard>
+        <DCArtboard label="Dept. Seal" width={360} height={360} style={{ background:rpColors.paper }}>
+          <div className="paper-tex" style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <RPSeal size={240} rotate={-4} />
+          </div>
+        </DCArtboard>
+
+        <DCPostIt top={-40} left={40} rotate={-4} width={210}>
+          Wordmark pun: a ghosted <b>duplicate</b> sits just behind the solid mark — you never see just one "Replicant."
+        </DCPostIt>
+      </DCSection>
+
+      {/* COLOR */}
+      <DCSection title="02 · Colour Tokens" subtitle="Aged paper + carbon ink. Red = the stamp of the state. Cyan = machine signal.">
+        <DCArtboard label="Paper & Ink" width={510} height={270} style={{ background:'#fff', padding:14 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, height:'100%' }}>
+            <Swatch color={rpColors.paper} name="PAPER" token="#E8DFC9" />
+            <Swatch color={rpColors.paper2} name="CARBON" token="#D9CFB5" />
+            <Swatch color={rpColors.paper3} name="MEMO" token="#F2EAD3" />
+            <Swatch color={rpColors.ink} name="INK" token="#1C1A15" on="#F2EAD3"/>
+          </div>
+        </DCArtboard>
+        <DCArtboard label="Stamps & Signal" width={510} height={270} style={{ background:'#fff', padding:14 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, height:'100%' }}>
+            <Swatch color={rpColors.stampRed} name="INK RED" token="#B32724" on="#F2EAD3"/>
+            <Swatch color={rpColors.stampGreen} name="APPROVED" token="#3F6B3A" on="#F2EAD3"/>
+            <Swatch color={rpColors.cyan} name="TERMINAL" token="#5FD3CC" />
+            <Swatch color={rpColors.amber} name="CAUTION" token="#D69E2E" />
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      {/* TYPE */}
+      <DCSection title="03 · Type System" subtitle="Display / Typewriter / Mono / Sans — the four voices of The Department.">
+        <DCArtboard label="Type specimens" width={900} height={560} style={{ background:rpColors.paper, padding:0 }}>
+          <div className="paper-tex" style={{ width:'100%', height:'100%', padding:36 }}>
+            <RPMemoHeader title="TYPEFACES" no="T-01" classification="OFFICIAL" />
+            <div style={{ display:'flex', flexDirection:'column', gap:22 }}>
+              <div>
+                <div className="t-eyebrow" style={{ color:rpColors.inkFaded }}>DISPLAY · OSWALD</div>
+                <div style={{ fontFamily:'Oswald, sans-serif', fontWeight:700, fontSize:72, lineHeight:0.9, color:rpColors.ink, textTransform:'uppercase', letterSpacing:'-0.01em' }}>TERMINATE SUBJECT 06</div>
+              </div>
+              <div>
+                <div className="t-eyebrow" style={{ color:rpColors.inkFaded }}>TYPEWRITER · SPECIAL ELITE</div>
+                <div style={{ fontFamily:'Special Elite, monospace', fontSize:24, color:rpColors.ink, lineHeight:1.4 }}>"A pleasure to verify your humanity, citizen."</div>
+              </div>
+              <div>
+                <div className="t-eyebrow" style={{ color:rpColors.inkFaded }}>MONO · JETBRAINS MONO</div>
+                <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:16, color:rpColors.ink, letterSpacing:'0.05em' }}>R-07 / NODE 04-7 / BALLOT CLOSES 00:47</div>
+              </div>
+              <div>
+                <div className="t-eyebrow" style={{ color:rpColors.inkFaded }}>SANS · INTER TIGHT (UI)</div>
+                <div style={{ fontFamily:'Inter Tight, sans-serif', fontSize:16, color:rpColors.ink }}>Body copy, form labels, secondary UI.</div>
+              </div>
+            </div>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard label="Stamps & redactions" width={520} height={560} style={{ background:rpColors.paper }}>
+          <div className="paper-tex" style={{ width:'100%', height:'100%', padding:40, display:'flex', flexDirection:'column', gap:34 }}>
+            <div>
+              <div className="t-eyebrow" style={{ color:rpColors.inkFaded, marginBottom:16 }}>OFFICIAL STAMPS</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:30, alignItems:'center' }}>
+                <RPStamp variant="red">Classified</RPStamp>
+                <RPStamp variant="red" rotate={4}>Terminated</RPStamp>
+                <RPStamp variant="green" rotate={-2}>Verified Human</RPStamp>
+                <RPStamp variant="blue" rotate={3}>Processed</RPStamp>
+              </div>
+            </div>
+            <div>
+              <div className="t-eyebrow" style={{ color:rpColors.inkFaded, marginBottom:12 }}>REDACTION</div>
+              <div style={{ fontFamily:'Special Elite, monospace', fontSize:18, color:rpColors.ink, lineHeight:1.7 }}>
+                The subject was last observed <RPRedact>in the observation bay</RPRedact> at <RPRedact width={80}>&nbsp;</RPRedact>, in the company of <RPRedact>unknown entities</RPRedact>.
+              </div>
+            </div>
+            <div>
+              <div className="t-eyebrow" style={{ color:rpColors.inkFaded, marginBottom:12 }}>INK RIBBON TREATMENT</div>
+              <div style={{ fontFamily:'Oswald, sans-serif', fontWeight:700, fontSize:48, color:rpColors.stampRed, letterSpacing:'-0.01em', lineHeight:0.9, textShadow:`1px 1px 0 ${rpColors.paper2}` }}>
+                DO NOT<br/>IMPEDE<br/>THE PROCESS.
+              </div>
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      {/* COMPONENTS */}
+      <DCSection title="04 · Component Library" subtitle="Buttons, chips, timers, ballots, tickers — the working parts of the system.">
+        <DCArtboard label="Buttons" width={480} height={380} style={{ background:rpColors.paper }}>
+          <div className="paper-tex" style={{ padding:28, height:'100%', display:'flex', flexDirection:'column', gap:18 }}>
+            <div className="t-eyebrow" style={{ color:rpColors.inkFaded }}>ACTIONS</div>
+            <RPButton variant="primary" full>DEPLOY GAME ▸</RPButton>
+            <RPButton variant="stamp" full>CAST BALLOT</RPButton>
+            <RPButton variant="quiet" full>ABSTAIN</RPButton>
+            <RPButton variant="ghost" full>REVIEW TRANSCRIPT</RPButton>
+            <div style={{ display:'flex', gap:8 }}>
+              <RPButton variant="primary">ACCEPT</RPButton>
+              <RPButton variant="stamp">REJECT</RPButton>
+            </div>
+          </div>
+        </DCArtboard>
+
+        <DCArtboard label="Player chips" width={480} height={380} style={{ background:rpColors.paper }}>
+          <div className="paper-tex" style={{ padding:28, height:'100%', display:'flex', flexDirection:'column', gap:12 }}>
+            <div className="t-eyebrow" style={{ color:rpColors.inkFaded }}>SUBJECT CARDS</div>
+            <RPPlayerChip name="MARA" num="#01" status="TERMINATED" portrait="M" accent={rpColors.stampRed} />
+            <RPPlayerChip name="JORDAN" num="#04" status="ACTIVE" portrait="J" accent={rpColors.stampBlue} />
+            <RPPlayerChip name="SAM" num="#06" status="SUSPECTED" portrait="S" accent={rpColors.ink} />
+            <RPPlayerChip name="DEV" num="#02" status="ACTIVE" portrait="D" accent={rpColors.stampGreen} small />
+          </div>
+        </DCArtboard>
+
+        <DCArtboard label="Timers, checkboxes, tickers" width={520} height={380} style={{ background:rpColors.paper }}>
+          <div className="paper-tex" style={{ padding:28, height:'100%', display:'flex', flexDirection:'column', gap:20 }}>
+            <div style={{ display:'flex', gap:40, alignItems:'flex-end' }}>
+              <RPTimer value="02:14" label="DAY ENDS IN" />
+              <RPTimer value="0:04" label="VOTE" danger />
+            </div>
+            <div>
+              <div className="t-eyebrow" style={{ color:rpColors.inkFaded, marginBottom:10 }}>VOTE BOXES</div>
+              <div style={{ display:'flex', gap:14, alignItems:'center' }}>
+                <RPCheckbox />
+                <RPCheckbox checked />
+                <RPCheckbox checked mark="✓" color={rpColors.stampGreen} />
+                <RPCheckbox checked mark="◼" color={rpColors.ink} />
+              </div>
+            </div>
+            <div style={{ border:`2px solid ${rpColors.ink}`, overflow:'hidden' }}>
+              <RPTicker items={['PROTOCOL R-07 ACTIVE','REPORT ANOMALIES','THE DEPARTMENT APPRECIATES YOUR COMPLIANCE']}/>
+            </div>
+            <div>
+              <div className="t-eyebrow" style={{ color:rpColors.inkFaded, marginBottom:8 }}>SEAL SCALES</div>
+              <div style={{ display:'flex', gap:16, alignItems:'center' }}>
+                <RPSeal size={48} /><RPSeal size={72} /><RPSeal size={96} />
+              </div>
+            </div>
+          </div>
+        </DCArtboard>
+
+        <DCPostIt top={-40} right={80} rotate={3} width={220}>
+          Every interactive element is a <b>form field</b>. Buttons are signatures. The UI is paperwork.
+        </DCPostIt>
+      </DCSection>
+
+      {/* HOST TV */}
+      <DCSection title="05 · Host Display · 1920×1080" subtitle="The shared TV. The Department's broadcast — dark, surveilled, authoritative.">
+        <TVBoard label="Lobby / Intake"><HostLobby /></TVBoard>
+        <TVBoard label="Narrator / Transmission"><HostNarrator /></TVBoard>
+        <TVBoard label="Night Cycle"><HostNight /></TVBoard>
+        <TVBoard label="Tribunal Result"><HostResults /></TVBoard>
+
+        <DCPostIt top={-40} left={60} rotate={-3} width={240}>
+          Host = <b>dark broadcast</b>. Mobile = <b>warm paper</b>. Same grid, same type, opposite materials. The Department vs. the citizen.
+        </DCPostIt>
+      </DCSection>
+
+      {/* MOBILE */}
+      <DCSection title="06 · Mobile · Personal Dossier" subtitle="Every player's phone is a confidential folder issued by The Department.">
+        <DCArtboard label="Role Reveal" width={420} height={860} style={{ background:'transparent', boxShadow:'none' }}>
+          <RPPhone width={404} height={844}><MobileRoleReveal /></RPPhone>
+        </DCArtboard>
+        <DCArtboard label="Tribunal Ballot" width={420} height={860} style={{ background:'transparent', boxShadow:'none' }}>
+          <RPPhone width={404} height={844}><MobileVoting /></RPPhone>
+        </DCArtboard>
+        <DCArtboard label="Whisper Channel" width={420} height={860} style={{ background:'transparent', boxShadow:'none' }}>
+          <RPPhone width={404} height={844}><MobileChat /></RPPhone>
+        </DCArtboard>
+
+        <DCPostIt top={-40} right={60} rotate={2} width={240}>
+          Roles: <b>HUMAN</b> (cyan), <b>REPLICANT</b> (red), <b>SINGULARITY</b> (amber). Each has its own dossier tone.
+        </DCPostIt>
+      </DCSection>
+
+      {/* CLOSING */}
+      <DCSection title="07 · Voice & Copy" subtitle="The Department is polite, bureaucratic, quietly threatening. A little campy.">
+        <DCArtboard label="Voice sample" width={900} height={360} style={{ background:rpColors.paper }}>
+          <div className="paper-tex" style={{ padding:40, height:'100%', display:'grid', gridTemplateColumns:'1fr 1fr', gap:40 }}>
+            <div>
+              <div className="t-eyebrow" style={{ color:rpColors.stampRed, marginBottom:12 }}>✓ DO</div>
+              <ul style={{ fontFamily:'Special Elite, monospace', fontSize:16, lineHeight:1.6, color:rpColors.ink, paddingLeft:20, margin:0 }}>
+                <li>"The Department appreciates your cooperation."</li>
+                <li>"Subject #04 has been processed. You may return to your duties."</li>
+                <li>"A satisfactory outcome. The paperwork reflects well on you."</li>
+                <li>"Close your eyes. Or don't. We see everything regardless."</li>
+              </ul>
+            </div>
+            <div>
+              <div className="t-eyebrow" style={{ color:rpColors.inkFaded, marginBottom:12 }}>✗ DON'T</div>
+              <ul style={{ fontFamily:'Special Elite, monospace', fontSize:16, lineHeight:1.6, color:rpColors.inkFaded, paddingLeft:20, margin:0 }}>
+                <li>"OMG you killed Sam! 😱"</li>
+                <li>"Vote now! Time's running out!!!"</li>
+                <li>"Welcome to the game!"</li>
+                <li>Exclamation points. Emoji. Excitement.</li>
+              </ul>
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

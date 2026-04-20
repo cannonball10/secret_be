@@ -32,8 +32,14 @@ export interface StreamOptions {
 // swap this for a native WebSocket or fetch-based SSE in production if
 // strict header-only auth is required.
 export function streamEnvelopes(opts: StreamOptions): StreamHandle {
+  // baseUrl is "" in dev (the Vite proxy forwards /api to :8080), so we
+  // can't hand the path to `new URL(path)` directly — it requires either
+  // an absolute URL or a base. Resolving against window.location.origin
+  // keeps the request same-origin and lets the proxy do its job.
+  const base = opts.baseUrl || window.location.origin;
   const url = new URL(
-    `${opts.baseUrl}/api/v1/games/${opts.gameId}/stream/${opts.role}`,
+    `/api/v1/games/${opts.gameId}/stream/${opts.role}`,
+    base,
   );
   // Most browsers don't send custom headers on EventSource, so we pass
   // the token as a query param that the server accepts (see

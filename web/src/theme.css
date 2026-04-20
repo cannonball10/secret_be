@@ -1,0 +1,283 @@
+/* Replicant — minimal wireframe styles.
+ *
+ * Plain system fonts, neutral colors, borders instead of decoration.
+ * Anything that was a "scene" or "pixel-art" element is gone. This
+ * file exists only to normalize spacing and give buttons/inputs a
+ * readable default layout. Design polish comes later.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  height: 100%;
+}
+
+body {
+  background: #fff;
+  color: #111;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.5rem 0;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+
+h3 {
+  font-size: 1rem;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: #fff;
+  border: 1px solid #888;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+button:hover:not([disabled]) {
+  background: #f0f0f0;
+}
+
+button:disabled {
+  color: #999;
+  border-color: #ccc;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+button.primary:hover:not([disabled]) {
+  background: #333;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+  background: #fff;
+  border: 1px solid #888;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+input:focus {
+  outline: 2px solid #111;
+  outline-offset: -1px;
+}
+
+/* ─── Page shell ──────────────────────────────────────────────── */
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.row > * {
+  flex: 1 1 auto;
+}
+
+.muted {
+  color: #666;
+}
+
+.hr {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 12px 0;
+}
+
+.error {
+  border: 1px solid #b00;
+  background: #fdd;
+  color: #700;
+  padding: 6px 10px;
+}
+
+/* ─── Title / landing ─────────────────────────────────────────── */
+
+.title {
+  max-width: 420px;
+  margin: 8vh auto 0;
+  padding: 16px;
+}
+
+.title h1 {
+  font-size: 2rem;
+  margin-bottom: 0;
+}
+
+.title .muted {
+  margin-bottom: 16px;
+}
+
+/* ─── Game view ───────────────────────────────────────────────── */
+
+.meters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meter {
+  border: 1px solid #888;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+}
+
+.powertrack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.slot {
+  min-width: 110px;
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid #bbb;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.slot.done {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.slot.upcoming {
+  border-color: #111;
+  font-weight: 600;
+}
+
+.slot.win {
+  border-color: #700;
+  color: #700;
+}
+
+.seats {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 1fr;
+}
+
+.seat {
+  border: 1px solid #bbb;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.seat.me {
+  border-color: #111;
+  background: #f7f7f7;
+}
+
+.tag {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border: 1px solid #888;
+}
+
+.tag.pres {
+  border-color: #700;
+  color: #700;
+}
+
+.tag.chan {
+  border-color: #006;
+  color: #006;
+}
+
+.tag.dead {
+  border-color: #000;
+  background: #000;
+  color: #fff;
+}
+
+.callout {
+  border: 1px solid #111;
+  padding: 10px;
+  background: #f7f7f7;
+}
+
+.secret {
+  border: 1px dashed #888;
+  padding: 10px;
+  background: #fafafa;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.banner {
+  border: 2px solid #111;
+  padding: 16px;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #06c;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.link:hover {
+  color: #039;
+}

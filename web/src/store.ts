@@ -20,6 +20,7 @@ import type {
   ExecutiveActionType,
   Game,
   GameEndedPayload,
+  GamePhase,
   GameStartedPayload,
   Government,
   InvestigateResultPayload,
@@ -51,8 +52,8 @@ export interface GameState {
   votes: Record<string, VoteChoice>; // cleared each round
   votesCast: Record<string, true>; // just the set of who's voted (for spoiler-free tallies)
   tracker: number;
-  liberal: number;
-  fascist: number;
+  humans: number;
+  ai: number;
   drawPileRemaining: number | null; // null = unknown
   winner: Party | null;
   winCondition: string | null;
@@ -93,8 +94,8 @@ export const initialState: GameState = {
   votes: {},
   votesCast: {},
   tracker: 0,
-  liberal: 0,
-  fascist: 0,
+  humans: 0,
+  ai: 0,
   drawPileRemaining: null,
   winner: null,
   winCondition: null,
@@ -134,8 +135,8 @@ export function reducer(state: GameState, action: Action): GameState {
         game: action.game,
         players: { ...state.players, ...players },
         tracker: action.game.electionTracker,
-        liberal: action.game.liberalPoliciesEnacted,
-        fascist: action.game.fascistPoliciesEnacted,
+        humans: action.game.humanPoliciesEnacted,
+        ai: action.game.aiPoliciesEnacted,
         me: action.mePlayerId
           ? { ...state.me, playerId: action.mePlayerId }
           : state.me,
@@ -218,6 +219,13 @@ function applyEnvelope(state: GameState, env: Envelope): GameState {
 
     case "game_ended":
       return handleGameEnded(next, p as GameEndedAnyPayload | undefined);
+
+    default:
+      // Unknown / future event types: keep the log entry and move on.
+      // Returning `next` (not falling through) prevents the reducer from
+      // ever yielding undefined, which would null-out state on the next
+      // render and blank the whole tree.
+      return next;
   }
 }
 
@@ -270,6 +278,7 @@ function handleGameStarted(s: GameState, p?: GameStartedPayload): GameState {
       phase: "nomination",
       playerCount: p.playerCount,
       presidentSeat: p.initialPresidentSeat,
+      round: p.round,
     },
   };
 }
@@ -300,24 +309,34 @@ function handleChancellorNominated(
   p?: ChancellorNominatedPayload,
 ): GameState {
   if (!s.game || !p) return s;
+  const president = Object.values(s.players).find(
+    (pl) => pl.playerId === p.presidentPlayerId,
+  );
   const chancellor = Object.values(s.players).find(
     (pl) => pl.playerId === p.chancellorPlayerId,
   );
+  // presidentSeat is authoritative from this event — rotation and
+  // special elections both update who the president is, and the stream
+  // doesn't emit a dedicated "president rotated" event (the new
+  // nomination implicitly announces it via presidentPlayerId).
+  const presidentSeat = president?.seat ?? s.game.presidentSeat;
   return {
     ...s,
     game: {
       ...s.game,
       phase: "election",
+      round: p.round,
       currentGovernmentId: p.governmentId,
+      presidentSeat,
       chancellorSeat: chancellor?.seat ?? null,
     },
     currentGovernment: {
       governmentId: p.governmentId,
       gameId: s.game.gameId,
-      round: s.game.round,
+      round: p.round,
       presidentPlayerId: p.presidentPlayerId,
       chancellorPlayerId: p.chancellorPlayerId,
-      presidentSeat: s.game.presidentSeat,
+      presidentSeat,
       chancellorSeat: chancellor?.seat ?? null,
       status: "proposed",
       isSpecialElection: false,
@@ -343,6 +362,35 @@ function handleElectionResult(
   p?: ElectionResultPayload,
 ): GameState {
   if (!p) return s;
+  // The engine currently piggybacks generic phase transitions on the
+  // election_result EventType carrying a PhaseChangedPayload instead of
+  // an ElectionResultPayload (see handlers/game/engine.go:setPhase).
+  // Discriminate by payload shape: a phase-change has `to`/`from`, a
+  // real election result has `passed`. Treating a phase-change as a
+  // real result would overwrite currentGovernment.status and skip the
+  // phase update, deadlocking the UI when the next actor is a human.
+  const phaseish = p as unknown as {
+    to?: GamePhase;
+    from?: GamePhase;
+    presidentSeat?: number;
+  };
+  if (phaseish.to && phaseish.from) {
+    if (!s.game) return s;
+    // The phase-change also carries the current presidentSeat, which
+    // is how the frontend learns about rotation after a policy enact
+    // (no dedicated event) and after a Special Election power.
+    return {
+      ...s,
+      game: {
+        ...s.game,
+        phase: phaseish.to,
+        presidentSeat:
+          typeof phaseish.presidentSeat === "number"
+            ? phaseish.presidentSeat
+            : s.game.presidentSeat,
+      },
+    };
+  }
   return {
     ...s,
     votes: p.votes,
@@ -391,6 +439,11 @@ function handlePresidentDiscarded(
   return next;
 }
 
+// VETO_UNLOCK_THRESHOLD mirrors schemas/secrethitler.VetoUnlockThreshold.
+// Kept here so the reducer can derive game.vetoUnlocked without waiting
+// on a dedicated event (the current backend doesn't broadcast it).
+const VETO_UNLOCK_THRESHOLD = 5;
+
 function handleChancellorEnacted(
   s: GameState,
   p?: ChancellorEnactedPayload,
@@ -398,14 +451,15 @@ function handleChancellorEnacted(
   if (!p || !s.game) return s;
   return {
     ...s,
-    liberal: p.liberalPoliciesEnacted,
-    fascist: p.fascistPoliciesEnacted,
+    humans: p.humanPoliciesEnacted,
+    ai: p.aiPoliciesEnacted,
     tracker: 0,
     game: {
       ...s.game,
-      liberalPoliciesEnacted: p.liberalPoliciesEnacted,
-      fascistPoliciesEnacted: p.fascistPoliciesEnacted,
+      humanPoliciesEnacted: p.humanPoliciesEnacted,
+      aiPoliciesEnacted: p.aiPoliciesEnacted,
       electionTracker: 0,
+      vetoUnlocked: p.aiPoliciesEnacted >= VETO_UNLOCK_THRESHOLD,
     },
     currentGovernment: s.currentGovernment
       ? { ...s.currentGovernment, status: "enacted", enactedPolicy: p.policy }
@@ -464,14 +518,15 @@ function handleTopDeck(s: GameState, p?: TopDeckPayload): GameState {
   if (!p || !s.game) return s;
   return {
     ...s,
-    liberal: p.liberalPoliciesEnacted,
-    fascist: p.fascistPoliciesEnacted,
+    humans: p.humanPoliciesEnacted,
+    ai: p.aiPoliciesEnacted,
     tracker: 0,
     game: {
       ...s.game,
-      liberalPoliciesEnacted: p.liberalPoliciesEnacted,
-      fascistPoliciesEnacted: p.fascistPoliciesEnacted,
+      humanPoliciesEnacted: p.humanPoliciesEnacted,
+      aiPoliciesEnacted: p.aiPoliciesEnacted,
       electionTracker: 0,
+      vetoUnlocked: p.aiPoliciesEnacted >= VETO_UNLOCK_THRESHOLD,
     },
   };
 }

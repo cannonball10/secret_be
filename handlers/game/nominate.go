@@ -48,8 +48,17 @@ func (h *GameHandler) NominateChancellor(ctx context.Context, gameID, presidentP
 		return nil, err
 	}
 
+	// Pick the next phase. With CablePhase enabled we interpose a
+	// cable-phase interstitial before the election vote; otherwise we
+	// jump straight to election (vanilla flow). Either way the
+	// deadline reported to the chancellor_nominated listener is the
+	// *next* phase's, so clients can pace their UI correctly.
+	nextPhase := secrethitler.PhaseElection
+	if game.Rules.CablePhaseMode == secrethitler.CableModeEveryRound {
+		nextPhase = secrethitler.PhaseCablePhase
+	}
 	deadlineStr := ""
-	if d := h.deadlineFor(secrethitler.PhaseElection); d != nil {
+	if d := h.deadlineFor(game, nextPhase); d != nil {
 		deadlineStr = d.UTC().Format(time.RFC3339)
 	}
 	ev := models.NewGameEvent(gameID, secrethitler.EventChancellorNominated, president.PlayerID).
@@ -59,9 +68,20 @@ func (h *GameHandler) NominateChancellor(ctx context.Context, gameID, presidentP
 		ChancellorPlayerID: chancellor.PlayerID,
 		GovernmentID:       gov.GovernmentID,
 		Deadline:           deadlineStr,
+		Round:              game.Round,
 	})
 
-	h.setPhase(ctx, game, secrethitler.PhaseElection, ReasonAction)
+	h.setPhase(ctx, game, nextPhase, ReasonAction)
+	if nextPhase == secrethitler.PhaseCablePhase {
+		// Surface a dedicated opener event so clients can mount
+		// chat controls without sniffing phase_changed. Payload is
+		// empty today; step 3b adds chat-specific fields.
+		openEv := models.NewGameEvent(gameID, secrethitler.EventCablePhaseOpened, "")
+		h.broadcast(ctx, openEv, CablePhaseOpenedPayload{
+			GovernmentID: gov.GovernmentID,
+			Deadline:     deadlineStr,
+		})
+	}
 	if err := h.saveGame(ctx, game); err != nil {
 		return nil, err
 	}
