@@ -154,6 +154,24 @@ func (s *Server) handleGetGame(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"game": g, "players": players})
 }
 
+// handleMyResume returns a full rehydrate bundle for the calling
+// device: the public game + roster, the current government (if any),
+// who has voted, the active executive action — plus any caller-
+// private state (their own role, drawn policies, chancellor options,
+// peek/investigation result, their own vote). Lets a reloaded mobile
+// client restore to exactly where it was without waiting for SSE
+// envelopes it already missed.
+func (s *Server) handleMyResume(c *gin.Context) {
+	gameID := c.Param("gameId")
+	uid := userID(c)
+	snap, err := s.engine.LoadResumeSnapshot(c.Request.Context(), gameID, uid)
+	if err != nil {
+		writeEngineError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, snap)
+}
+
 // --- host actions ----------------------------------------------------------
 
 // handleCurrentLeak returns the leaked cable for the game's current

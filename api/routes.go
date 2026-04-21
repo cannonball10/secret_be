@@ -46,6 +46,7 @@ func (s *Server) registerRoutes() {
 	v1.POST("/games/join", s.handleJoinGame)
 	v1.GET("/games/:gameId", s.handleGetGame)
 	v1.GET("/games/:gameId/current-leak", s.handleCurrentLeak)
+	v1.GET("/games/:gameId/me/resume", s.handleMyResume)
 
 	// Host actions (board device)
 	host := v1.Group("/games/:gameId/host")

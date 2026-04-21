@@ -145,15 +145,8 @@ export default function MobileGamePage() {
     (async () => {
       try {
         const api = new MobileApi({ token: s.token });
-        const snap = await api.getGame(s.gameId);
-        setGame(snap.game);
-        const ix: Record<string, Player> = {};
-        for (const p of snap.players) ix[p.playerId] = p;
-        setPlayers(ix);
-        if (snap.game.status === "completed") {
-          setFinalWinner(snap.game.winner ?? null);
-          setFinalCondition(snap.game.winCondition ?? null);
-        }
+        const snap = await api.resume(s.gameId);
+        hydrateFromResume(snap, s.playerId);
         // DM history — persisted thread so reloads don't start empty.
         // SSE only replays from the moment the stream attaches, so
         // without this the drawer would show no prior conversation.
@@ -171,38 +164,76 @@ export default function MobileGamePage() {
     })();
   }, [router]);
 
-  // Reconcile from authoritative server snapshot. Called only after
-  // an SSE error-then-reconnect — not on initial open, because the
-  // boot useEffect already hydrated state and a redundant refetch
-  // would race with concurrently-arriving envelopes (the snapshot
-  // may return stale state while a fresher envelope is mid-flight).
+  // hydrateFromResume takes the server-built bundle and writes every
+  // piece of derived client state so the UI renders identically to
+  // what the player had before the refresh — no "The President is
+  // choosing" fallback, no lost whispered state, no blank vote tally.
+  function hydrateFromResume(snap: import("@/lib/api").MobileResumeSnapshot, meId: string) {
+    setGame(snap.game);
+    const ix: Record<string, Player> = {};
+    for (const p of snap.players) ix[p.playerId] = p;
+    setPlayers(ix);
+
+    if (snap.government) {
+      setPresidentPlayerId(snap.government.presidentPlayerId || null);
+      setChancellorPlayerId(snap.government.chancellorPlayerId || null);
+    } else {
+      // No active government — fall back to the seat on Game so the
+      // header still knows who's next up.
+      const pres = Object.values(ix).find((p) => p.seat === snap.game.presidentSeat);
+      setPresidentPlayerId(pres?.playerId ?? null);
+      setChancellorPlayerId(null);
+    }
+
+    // Voted set — just who has voted, not their choices. Matches what
+    // the live vote_cast envelope would populate.
+    if (snap.votes) {
+      const voted: Record<string, true> = {};
+      for (const v of snap.votes) voted[v.playerId] = true;
+      setVotedSet(voted);
+    } else {
+      setVotedSet({});
+    }
+
+    // Caller-private slots. Any nil here clears — a resume that
+    // arrives after the phase moved past the peek should not keep
+    // a stale overlay visible.
+    setDrawnPolicies(snap.myDrawnPolicies ?? null);
+    setChancellorOptions(snap.myChancellorOptions ?? null);
+    setPeekedPolicies(snap.myPeekedPolicies ?? null);
+    setInvestigation(snap.myInvestigation ?? null);
+
+    // My role / party / teammates may also be on the session from
+    // the role_assigned whisper, but the server is authoritative —
+    // overwrite only if the resume returned a value.
+    if (snap.me?.role) setRole(snap.me.role);
+    if (snap.me?.party) setParty(snap.me.party);
+
+    if (snap.game.status === "completed") {
+      setFinalWinner(snap.game.winner ?? null);
+      setFinalCondition(snap.game.winCondition ?? null);
+    }
+    void meId; // silence unused-arg lint; kept for future caller-scoped branches
+  }
+
+  // Reconcile from authoritative server snapshot. Called after an
+  // SSE error-then-reconnect. Uses the full resume bundle so any
+  // envelopes we missed during the outage are recovered in one hit:
+  // pres/chancellor identities, votes already cast, caller-private
+  // whispers (drawn policies, peek, investigation). The reconcile
+  // is gated on hadStreamErrorRef upstream to avoid racing live
+  // envelopes on a clean boot.
   const reconcileSnapshot = useCallback(async () => {
-    if (!gameId || !token) return;
+    if (!gameId || !token || !myPlayerId) return;
     try {
       const api = new MobileApi({ token });
-      const snap = await api.getGame(gameId);
-      setGame(snap.game);
-      setPlayers((prev) => {
-        const ix: Record<string, Player> = {};
-        for (const p of snap.players) ix[p.playerId] = p;
-        for (const id of Object.keys(prev)) {
-          if (prev[id] && !prev[id]!.isAlive && ix[id]) {
-            ix[id] = { ...ix[id]!, isAlive: false };
-          }
-        }
-        return ix;
-      });
-      if (snap.game.status === "completed") {
-        setFinalWinner(snap.game.winner ?? null);
-        setFinalCondition(snap.game.winCondition ?? null);
-      }
-      if (myPlayerId) {
-        try {
-          const hist = await api.dmHistory(gameId);
-          setDmThreads(partitionDMsByPeer(hist.messages, myPlayerId));
-        } catch {
-          /* non-fatal */
-        }
+      const snap = await api.resume(gameId);
+      hydrateFromResume(snap, myPlayerId);
+      try {
+        const hist = await api.dmHistory(gameId);
+        setDmThreads(partitionDMsByPeer(hist.messages, myPlayerId));
+      } catch {
+        /* non-fatal */
       }
     } catch (e) {
       console.warn("[reconcile] snapshot fetch failed", e);

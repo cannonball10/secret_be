@@ -2,8 +2,56 @@
 // apps/host/lib/api.ts but exposes only the endpoints a player
 // actually needs.
 
-import type { ChatChannel, ChatMessagePayload, Game, Government, Player, VoteChoice } from "@replicant/schema";
+import type {
+  ChatChannel,
+  ChatMessagePayload,
+  ExecutiveActionType,
+  Game,
+  Government,
+  Party,
+  Player,
+  PolicyType,
+  Role,
+  VoteChoice,
+} from "@replicant/schema";
 import { API_ORIGIN } from "./env";
+
+/** Resume bundle mirror of api/resume.go ResumeSnapshot. Keep field
+ *  names in sync with the server's JSON tags. */
+export interface MobileResumeSnapshot {
+  game: Game;
+  players: Player[];
+  government?: {
+    governmentId: string;
+    round: number;
+    presidentPlayerId: string;
+    chancellorPlayerId?: string;
+    presidentSeat: number;
+    chancellorSeat?: number;
+    status: string;
+    isSpecialElection: boolean;
+    jaVotes: number;
+    neinVotes: number;
+    enactedPolicy?: PolicyType;
+    vetoProposed: boolean;
+    vetoAccepted: boolean;
+  };
+  votes?: { playerId: string }[];
+  action?: {
+    actionId: string;
+    type: ExecutiveActionType;
+    presidentPlayerId: string;
+    targetPlayerId?: string;
+    revealedParty?: Party;
+    completed: boolean;
+  };
+  me?: Player & { role?: Role; party?: Party };
+  myVote?: VoteChoice;
+  myDrawnPolicies?: PolicyType[];
+  myChancellorOptions?: PolicyType[];
+  myPeekedPolicies?: PolicyType[];
+  myInvestigation?: { targetPlayerId: string; party: Party };
+}
 
 /** Tokens may be static (a guest deviceId) or an async Clerk JWT
  *  supplier. Passing a function allows Clerk tokens to refresh
@@ -44,6 +92,21 @@ export class MobileApi {
 
   getGame(gameId: string): Promise<{ game: Game; players: Player[] }> {
     return this.get(`/api/v1/games/${gameId}`);
+  }
+
+  /** Full resume bundle — everything a reloaded client needs to
+   *  skip the "waiting for SSE to catch me up" gap. Returns public
+   *  fields for the whole table plus caller-private slots populated
+   *  only when the caller is the player they describe. */
+  resume(gameId: string): Promise<MobileResumeSnapshot> {
+    return this.get(`/api/v1/games/${gameId}/me/resume`);
+  }
+
+  /** Replay the latest cable leak for the current government. Used
+   *  on reconnect so the banner reappears when SSE missed the
+   *  original envelope. Returns {leak: null} when no leak is active. */
+  currentLeak(gameId: string): Promise<{ leak: import("@replicant/schema").CableLeakedPayload | null }> {
+    return this.get(`/api/v1/games/${gameId}/current-leak`);
   }
 
   // ─── player actions ─────────────────────────────────────────────
