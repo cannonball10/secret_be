@@ -7,11 +7,20 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RPButton } from "@replicant/ui";
+import { MobileApi } from "@/lib/api";
+import { deviceId } from "@/lib/deviceId";
 import { loadSession } from "@/lib/session";
+import { CLERK_ENABLED, useSignedIn, useTokenSupplier } from "@/lib/useToken";
+import { SignInButton, UserButton } from "@clerk/nextjs";
+
+const LINK_DONE_KEY = "replicant:guestLinked";
 
 export default function MobileHomePage() {
   const router = useRouter();
   const [code, setCode] = useState("");
+  const { isSignedIn } = useSignedIn();
+
+  const getToken = useTokenSupplier();
 
   // Bounce live sessions straight to the passport.
   useEffect(() => {
@@ -19,12 +28,71 @@ export default function MobileHomePage() {
     if (s) router.replace("/game");
   }, [router]);
 
+  // Just-signed-in? Merge any guest passport history onto the new
+  // account. Tracked via a localStorage flag so a signed-in user's
+  // subsequent refreshes don't keep calling the link endpoint. The
+  // flag is cleared when we clearSession (i.e. on sign-out logic
+  // elsewhere, or manually).
+  useEffect(() => {
+    if (!isSignedIn) return;
+    try {
+      if (window.localStorage.getItem(LINK_DONE_KEY) === "1") return;
+    } catch {
+      return;
+    }
+    (async () => {
+      try {
+        const api = new MobileApi({ token: getToken });
+        const res = await api.linkGuest(deviceId());
+        if (res.linked) {
+          // eslint-disable-next-line no-console
+          console.info("[auth] merged", res.entriesMoved, "guest games");
+        }
+        window.localStorage.setItem(LINK_DONE_KEY, "1");
+      } catch {
+        /* non-fatal — the user's play history just stays split until
+         * the next attempt. */
+      }
+    })();
+  }, [isSignedIn, getToken]);
+
   const canContinue = code.trim().length >= 4;
 
   return (
     <main style={{ padding: "40px 24px", display: "flex", flexDirection: "column", gap: 20 }}>
-      <div className="t-eyebrow" style={{ color: "var(--stamp-red)" }}>
-        ◼ PLANETARY COMMITTEE · ACCORD R-07
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 4,
+        }}
+      >
+        <div className="t-eyebrow" style={{ color: "var(--stamp-red)" }}>
+          ◼ PLANETARY COMMITTEE · ACCORD R-07
+        </div>
+        {CLERK_ENABLED && (
+          isSignedIn ? (
+            <UserButton afterSignOutUrl="/" />
+          ) : (
+            <SignInButton mode="modal">
+              <button
+                className="t-eyebrow"
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--ink)",
+                  color: "var(--ink)",
+                  padding: "4px 8px",
+                  fontSize: 9,
+                  letterSpacing: 1.2,
+                  cursor: "pointer",
+                }}
+              >
+                SIGN IN
+              </button>
+            </SignInButton>
+          )
+        )}
       </div>
       <div
         style={{

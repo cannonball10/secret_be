@@ -10,6 +10,7 @@ import { RPButton, RPSeal } from "@replicant/ui";
 import { MobileApi, ApiError } from "@/lib/api";
 import { deviceId, resetDeviceId } from "@/lib/deviceId";
 import { clearSession, loadSession, saveSession } from "@/lib/session";
+import { useTokenSupplier } from "@/lib/useToken";
 
 export default function MobileJoinPage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function MobileJoinPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const getToken = useTokenSupplier();
 
   // ?asNew=1 forces a fresh device identity + clears any prior session.
   // Lets one browser profile seat multiple players during local QA
@@ -47,11 +49,14 @@ export default function MobileJoinPage() {
     setBusy(true);
     setErr(null);
     try {
-      const token = deviceId();
-      const api = new MobileApi({ token });
+      // Resolve the token at click time: signed-in players get their
+      // Clerk JWT and the server resolves them to their Clerk User
+      // row; guests fall back to their persistent deviceId.
+      const t = await getToken();
+      const api = new MobileApi({ token: getToken });
       const { game, player } = await api.joinGame(code, name.trim());
       saveSession({
-        token,
+        token: t,
         gameId: game.gameId,
         joinCode: game.joinCode,
         playerId: player.playerId,

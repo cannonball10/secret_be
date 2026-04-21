@@ -21,6 +21,7 @@ import { HostApi, ApiError } from "@/lib/api";
 import { deviceId } from "@/lib/deviceId";
 import { clearSession, loadSession, saveSession } from "@/lib/session";
 import { useStream } from "@/lib/useStream";
+import { useTokenSupplier } from "@/lib/useToken";
 import { SettingsButton } from "./settings";
 
 const MIN_PLAYERS = 5;
@@ -54,6 +55,7 @@ export default function HostLobbyPage() {
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Record<string, Player>>({});
   const [err, setErr] = useState<string | null>(null);
+  const getToken = useTokenSupplier();
 
   // ── Boot: resolve the session's gameId from the code via GET. ──
   useEffect(() => {
@@ -65,11 +67,15 @@ export default function HostLobbyPage() {
       router.replace("/");
       return;
     }
-    setToken(cached.token);
 
     (async () => {
       try {
-        const api = new HostApi({ token: cached.token });
+        // Resolve the token once for SSE — EventSource doesn't
+        // refresh mid-connection. REST calls still go through
+        // getToken so they pick up rotated JWTs automatically.
+        const t = await getToken();
+        setToken(t);
+        const api = new HostApi({ token: getToken });
         const snap = await api.getGame(cached.gameId);
         setGame(snap.game);
         const ix: Record<string, Player> = {};
@@ -84,7 +90,7 @@ export default function HostLobbyPage() {
         setErr(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
       }
     })();
-  }, [code, router]);
+  }, [code, router, getToken]);
 
   // ── SSE: keep the roster live. ─────────────────────────────────
   useStream({
@@ -138,9 +144,9 @@ export default function HostLobbyPage() {
   }, [code]);
 
   const deploy = async () => {
-    if (!game || !token || !ready) return;
+    if (!game || !ready) return;
     try {
-      const api = new HostApi({ token });
+      const api = new HostApi({ token: getToken });
       await api.startGame(game.gameId);
       // game_started envelope will arrive via SSE and route us.
     } catch (e) {
@@ -158,7 +164,7 @@ export default function HostLobbyPage() {
       <RPTVChrome title="CANDIDATE INTAKE" nodeId={`NODE ${code.slice(0, 6)}`} phase="PRE-DEPLOY">
         <SettingsButton
           game={game}
-          token={token}
+          token={getToken}
           onRulesUpdated={(g) => setGame(g)}
         />
         {err && (

@@ -5,6 +5,11 @@
 import type { ChatChannel, ChatMessagePayload, Game, Government, Player, VoteChoice } from "@replicant/schema";
 import { API_ORIGIN } from "./env";
 
+/** Tokens may be static (a guest deviceId) or an async Clerk JWT
+ *  supplier. Passing a function allows Clerk tokens to refresh
+ *  per-request without the caller threading a useEffect. */
+export type TokenSupplier = string | (() => string | Promise<string>);
+
 export class ApiError extends Error {
   constructor(public readonly status: number, public readonly body: unknown, message: string) {
     super(message);
@@ -12,7 +17,23 @@ export class ApiError extends Error {
 }
 
 export class MobileApi {
-  constructor(private opts: { token: string; baseUrl?: string }) {}
+  constructor(private opts: { token: TokenSupplier; baseUrl?: string }) {}
+
+  /** Fetch the authenticated caller's identity + passport. */
+  me(): Promise<{
+    user: { userId: string; displayName: string; email: string; authenticationProvider: string };
+    passport: unknown;
+    provider: string;
+  }> {
+    return this.get("/api/v1/me");
+  }
+
+  /** Merge a guest's passport history onto the signed-in user.
+   *  Call this once right after the first successful Clerk sign-in
+   *  with the deviceId the caller was using beforehand. */
+  linkGuest(deviceId: string): Promise<{ linked: boolean; reason?: string; entriesMoved?: number }> {
+    return this.post("/api/v1/me/link", { deviceId });
+  }
 
   joinGame(
     joinCode: string,
@@ -95,12 +116,19 @@ export class MobileApi {
     return this.request<T>("POST", path, body);
   }
 
+  private async resolveToken(): Promise<string> {
+    const tok = this.opts.token;
+    if (typeof tok === "function") return (await tok()) ?? "";
+    return tok ?? "";
+  }
+
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const url = (this.opts.baseUrl ?? API_ORIGIN) + path;
+    const token = await this.resolveToken();
     const res = await fetch(url, {
       method,
       headers: {
-        Authorization: `Bearer ${this.opts.token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,

@@ -31,6 +31,7 @@ import type {
 import { HostApi, ApiError } from "@/lib/api";
 import { clearSession, loadSession } from "@/lib/session";
 import { useStream } from "@/lib/useStream";
+import { useTokenSupplier } from "@/lib/useToken";
 import { HostNarrator } from "./narrator";
 
 interface LastElection {
@@ -57,6 +58,7 @@ export default function HostGamePage() {
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Record<string, Player>>({});
   const [err, setErr] = useState<string | null>(null);
+  const getToken = useTokenSupplier();
 
   const [presidentPlayerId, setPresidentPlayerId] = useState<string | null>(null);
   const [chancellorPlayerId, setChancellorPlayerId] = useState<string | null>(null);
@@ -88,10 +90,11 @@ export default function HostGamePage() {
       router.replace("/");
       return;
     }
-    setToken(cached.token);
     (async () => {
       try {
-        const api = new HostApi({ token: cached.token });
+        const t = await getToken();
+        setToken(t);
+        const api = new HostApi({ token: getToken });
         const snap = await api.getGame(cached.gameId);
         setGame(snap.game);
         const ix: Record<string, Player> = {};
@@ -144,15 +147,15 @@ export default function HostGamePage() {
         setErr(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
       }
     })();
-  }, [code, router]);
+  }, [code, router, getToken]);
 
   // Reconcile from the authoritative server snapshot. Fires on every
   // SSE open event so reconnections pick up any envelopes missed
   // during the gap (phase transitions, vote counts, policy tallies).
   const reconcileSnapshot = async () => {
-    if (!token || !game) return;
+    if (!game) return;
     try {
-      const api = new HostApi({ token });
+      const api = new HostApi({ token: getToken });
       const snap = await api.getGame(game.gameId);
       setGame(snap.game);
       setPlayers((prev) => {
@@ -190,12 +193,12 @@ export default function HostGamePage() {
   // failures — a missing ANTHROPIC/ELEVENLABS key just means the host
   // doesn't get voiceovers; the game continues.
   const fireCue = (cueKey: string, cue: string, vars: Record<string, string>) => {
-    if (!token || !game) return;
+    if (!game) return;
     if (firedCuesRef.current.has(cueKey)) return;
     firedCuesRef.current.add(cueKey);
     void (async () => {
       try {
-        const api = new HostApi({ token });
+        const api = new HostApi({ token: getToken });
         await api.narrate(game.gameId, cue, { vars });
       } catch {
         /* narrator disabled or errored — ignore */
@@ -416,11 +419,10 @@ export default function HostGamePage() {
         // game is completed, so this re-hydrates `players` with true
         // identities for the post-mortem.
         const g = game;
-        const tok = token;
-        if (g && tok) {
+        if (g) {
           (async () => {
             try {
-              const api = new HostApi({ token: tok });
+              const api = new HostApi({ token: getToken });
               const snap = await api.getGame(g.gameId);
               const ix: Record<string, Player> = {};
               for (const pl of snap.players) ix[pl.playerId] = pl;

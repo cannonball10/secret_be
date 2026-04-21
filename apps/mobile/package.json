@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^5.0.0",
     "@replicant/schema": "workspace:*",
     "@replicant/tokens": "workspace:*",
     "@replicant/ui": "workspace:*",

@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 import type { Game, RulesConfig } from "@replicant/schema";
 import { rpColors } from "@replicant/tokens";
-import { HostApi, ApiError } from "@/lib/api";
+import { HostApi, ApiError, type TokenSupplier } from "@/lib/api";
 import {
   DEFAULT_VOLUME,
   getVolume,
@@ -28,7 +28,7 @@ export function SettingsButton({
   disabled,
 }: {
   game: Game | null;
-  token: string | null;
+  token: TokenSupplier | null;
   onRulesUpdated?: (g: Game) => void;
   disabled?: boolean;
 }) {
@@ -76,7 +76,7 @@ function SettingsModal({
   onRulesUpdated,
 }: {
   game: Game | null;
-  token: string | null;
+  token: TokenSupplier | null;
   onClose: () => void;
   onRulesUpdated?: (g: Game) => void;
 }) {
@@ -110,7 +110,7 @@ function SettingsModal({
     setSaving(true);
     setErr(null);
     try {
-      const api = new HostApi({ token });
+      const api = new HostApi({ token: token });
       const res = await api.updateRules(game.gameId, draft);
       onRulesUpdated?.(res.game);
     } catch (e) {

@@ -16,6 +16,8 @@ import { RPButton, RPWordmark } from "@replicant/ui";
 import { HostApi, ApiError } from "@/lib/api";
 import { deviceId } from "@/lib/deviceId";
 import { clearSession, loadSession, saveSession } from "@/lib/session";
+import { CLERK_ENABLED, useSignedIn, useTokenSupplier } from "@/lib/useToken";
+import { SignInButton, UserButton } from "@clerk/nextjs";
 
 type BootState = "boot" | "ready" | "working" | "error";
 
@@ -23,6 +25,8 @@ export default function HomePage() {
   const router = useRouter();
   const [state, setState] = useState<BootState>("boot");
   const [err, setErr] = useState<string | null>(null);
+  const getToken = useTokenSupplier();
+  const { isSignedIn } = useSignedIn();
 
   // Boot: restore a cached board session if still live.
   useEffect(() => {
@@ -34,7 +38,7 @@ export default function HomePage() {
         return;
       }
       try {
-        const api = new HostApi({ token: cached.token });
+        const api = new HostApi({ token: getToken });
         const { game } = await api.getGame(cached.gameId);
         if (cancelled) return;
         if (game.status === "completed" || game.status === "abandoned") {
@@ -55,17 +59,19 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, getToken]);
 
   const host = async () => {
     setState("working");
     setErr(null);
     try {
-      const token = deviceId();
-      const api = new HostApi({ token });
+      const api = new HostApi({ token: getToken });
       const { game } = await api.createGame();
+      // Store deviceId as the session token for backwards compat
+      // with code paths that still read session.token. Once every
+      // caller moves to useTokenSupplier this field will be pruned.
       saveSession({
-        token,
+        token: deviceId(),
         gameId: game.gameId,
         role: "board",
         joinCode: game.joinCode,
@@ -88,8 +94,42 @@ export default function HomePage() {
         gap: 28,
         padding: 48,
         textAlign: "center",
+        position: "relative",
       }}
     >
+      {CLERK_ENABLED && (
+        <div
+          style={{
+            position: "absolute",
+            top: 20,
+            right: 24,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          {isSignedIn ? (
+            <UserButton afterSignOutUrl="/" />
+          ) : (
+            <SignInButton mode="modal">
+              <button
+                className="t-eyebrow"
+                style={{
+                  background: "transparent",
+                  color: "var(--paper-3)",
+                  border: "1px solid var(--paper-3)",
+                  padding: "6px 12px",
+                  fontSize: 10,
+                  letterSpacing: 1.4,
+                  cursor: "pointer",
+                }}
+              >
+                ▸ SIGN IN · SAVE PASSPORT
+              </button>
+            </SignInButton>
+          )}
+        </div>
+      )}
       <div className="t-eyebrow" style={{ color: "var(--cyan)" }}>
         ◼ PLANETARY COMMITTEE · ACCORD R-07
       </div>

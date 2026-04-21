@@ -6,6 +6,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Oswald, Special_Elite, JetBrains_Mono, Inter_Tight } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "@replicant/tokens/styles.css";
 
 const oswald = Oswald({
@@ -43,7 +44,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const fontVars = [oswald.variable, specialElite.variable, jetbrainsMono.variable, interTight.variable].join(" ");
-  return (
+  // Only mount ClerkProvider when a publishable key is present — v5
+  // throws at runtime if the key is missing, which would kill the
+  // dev-without-Clerk path. The child components gate Clerk hooks
+  // behind CLERK_ENABLED (lib/useToken.ts) so they no-op when the
+  // provider isn't mounted.
+  const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const body = (
     <html lang="en" className={fontVars}>
       <body
         style={{
@@ -57,4 +64,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </body>
     </html>
   );
+  if (!clerkKey) return body;
+  return <ClerkProvider>{body}</ClerkProvider>;
 }

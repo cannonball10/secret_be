@@ -5,6 +5,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Oswald, Special_Elite, JetBrains_Mono, Inter_Tight } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "@replicant/tokens/styles.css";
 
 const oswald = Oswald({
@@ -47,7 +48,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const fontVars = [oswald.variable, specialElite.variable, jetbrainsMono.variable, interTight.variable].join(" ");
-  return (
+  // ClerkProvider mount is gated on the publishable key: v5 throws
+  // without one, but this app MUST work without Clerk for guests.
+  const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const body = (
     <html lang="en" className={fontVars}>
       <body
         className="paper-tex"
@@ -62,4 +66,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </body>
     </html>
   );
+  if (!clerkKey) return body;
+  return <ClerkProvider>{body}</ClerkProvider>;
 }

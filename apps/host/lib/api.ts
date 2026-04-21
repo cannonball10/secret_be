@@ -15,8 +15,17 @@ import type {
 } from "@replicant/schema";
 import { API_ORIGIN } from "./env";
 
+/**
+ * Tokens can be static (a fixed guest deviceId) or async (a Clerk
+ * JWT that we pull fresh before every request, since Clerk tokens
+ * default to a 60-second lifetime). Passing a function lets the
+ * Clerk getToken() handler refresh transparently without the caller
+ * having to thread a useEffect through every screen.
+ */
+export type TokenSupplier = string | (() => string | Promise<string>);
+
 export interface ApiClientOptions {
-  token: string;
+  token: TokenSupplier;
   baseUrl?: string;
 }
 
@@ -32,6 +41,14 @@ export class ApiError extends Error {
 
 export class HostApi {
   constructor(private opts: ApiClientOptions) {}
+
+  /** Fetch the authenticated caller's identity + passport. Returns
+   *  passport as an empty-counters object when the user has never
+   *  finished a game. Used by the host header to show "signed in as
+   *  …" and offer a sign-in CTA for guests. */
+  me(): Promise<{ user: { userId: string; displayName: string; email: string; authenticationProvider: string }; passport: unknown; provider: string }> {
+    return this.get("/api/v1/me");
+  }
 
   /** Create a new session. Empty displayName ⇒ board-only (no Player). */
   createGame(displayName = ""): Promise<{ game: Game; player: Player | null }> {
@@ -92,12 +109,19 @@ export class HostApi {
     return this.request<T>("PUT", path, body);
   }
 
+  private async resolveToken(): Promise<string> {
+    const tok = this.opts.token;
+    if (typeof tok === "function") return (await tok()) ?? "";
+    return tok ?? "";
+  }
+
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const url = (this.opts.baseUrl ?? API_ORIGIN) + path;
+    const token = await this.resolveToken();
     const res = await fetch(url, {
       method,
       headers: {
-        Authorization: `Bearer ${this.opts.token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
