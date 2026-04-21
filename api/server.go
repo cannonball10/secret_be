@@ -141,22 +141,37 @@ func NewServer(opts Options) *Server {
 // Origin when it's in the allow-list (or when "*" is allow-listed) and
 // handles OPTIONS preflights. Tokens may travel on the query string for
 // SSE, so we explicitly allow that header family plus Authorization.
+//
+// Wildcard entries are supported for "any subdomain of X" patterns —
+// "https://*.ngrok-free.dev" matches every ephemeral ngrok tunnel
+// without needing to update .env every time ngrok rolls the URL.
+// The leftmost label is the only one that's a wildcard; the scheme
+// and the rest of the host must match exactly.
 func corsMiddleware(allowed []string) gin.HandlerFunc {
 	allowAll := false
+	exact := make(map[string]bool, len(allowed))
+	var wildcards []string
 	for _, o := range allowed {
 		if o == "*" {
 			allowAll = true
-			break
+			continue
 		}
-	}
-	allowSet := make(map[string]bool, len(allowed))
-	for _, o := range allowed {
-		allowSet[strings.ToLower(strings.TrimRight(o, "/"))] = true
+		norm := strings.ToLower(strings.TrimRight(o, "/"))
+		if strings.Contains(norm, "://*.") {
+			// Store the suffix that every match must end with,
+			// including the scheme up to and including "://".
+			i := strings.Index(norm, "://*.")
+			scheme := norm[:i+len("://")]
+			suffix := norm[i+len("://*."):]
+			wildcards = append(wildcards, scheme+"|."+suffix)
+			continue
+		}
+		exact[norm] = true
 	}
 	return func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-		if origin != "" && (allowAll || allowSet[strings.ToLower(origin)]) {
-			c.Header("Access-Control-Allow-Origin", origin)
+		origin := strings.ToLower(c.GetHeader("Origin"))
+		if origin != "" && (allowAll || exact[origin] || matchesWildcard(origin, wildcards)) {
+			c.Header("Access-Control-Allow-Origin", c.GetHeader("Origin"))
 			c.Header("Vary", "Origin")
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -172,6 +187,25 @@ func corsMiddleware(allowed []string) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// matchesWildcard tests whether origin matches any pattern of the
+// form "scheme://|.suffix" (produced by corsMiddleware). Encoded
+// this way so a single pass can check both the scheme match and the
+// suffix match — we intentionally do NOT let "http://*.example.com"
+// allow "https://...example.com" since the schemes differ.
+func matchesWildcard(origin string, patterns []string) bool {
+	for _, p := range patterns {
+		pipe := strings.Index(p, "|")
+		if pipe <= 0 {
+			continue
+		}
+		scheme, suffix := p[:pipe], p[pipe+1:]
+		if strings.HasPrefix(origin, scheme) && strings.HasSuffix(origin, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 // Handler exposes the underlying http.Handler so the caller can mount
