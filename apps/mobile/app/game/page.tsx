@@ -52,6 +52,7 @@ import {
   RoleReminder,
   Terminated,
   WaitFor,
+  type Candidate,
 } from "./panels";
 import { DMDrawer } from "./dms";
 import { RulesHelper } from "./rules";
@@ -374,6 +375,35 @@ export default function MobileGamePage() {
       }
 
       if (type === "executive_action") {
+        // Broadcast envelope announces the pending power kind so the
+        // president's device knows *which* panel to render. Without
+        // this, the client's game.pendingActionType stays empty even
+        // after phase becomes executive_action — the ExecutivePanel
+        // would never mount and the president just sees STANDBY.
+        if (env.audience.scope === "broadcast") {
+          const p = env.payload as
+            | {
+                actionId?: string;
+                type?: Game["pendingActionType"];
+                presidentPlayerId?: string;
+              }
+            | undefined;
+          if (p?.type) {
+            setGame((prev) =>
+              prev
+                ? { ...prev, pendingActionType: p.type, pendingActionId: p.actionId ?? prev.pendingActionId }
+                : prev,
+            );
+          }
+          // Policy peek resolves inline on the server and advances
+          // back to nomination without ever entering the executive
+          // action phase; the president still sees the peeked cards
+          // via the whisper branch below, no action UI needed.
+          if (p?.presidentPlayerId) {
+            setPresidentPlayerId(p.presidentPlayerId);
+          }
+          return;
+        }
         if (env.audience.scope === "player" && env.audience.playerId === myPlayerId) {
           const p = env.payload as
             | { targetPlayerId?: string; party?: Party; policies?: PolicyType[] }
@@ -916,9 +946,23 @@ function Body(props: BodyProps) {
   switch (game.phase) {
     case "nomination": {
       if (iAmPresident) {
+        // Pre-filter the roster but don't *omit* term-limited
+        // delegates — showing them as disabled with a "TERM-LIMITED"
+        // note is much clearer than letting the president tap and
+        // hit a 409. In tables of 6+ only the prior Envoy is locked
+        // out; in 5-handed games the prior President is locked out
+        // too (PreviousPresidentSeat is only set by the server at 5p).
+        const prevChancellor = game.previousChancellorSeat ?? null;
+        const prevPresident = game.previousPresidentSeat ?? null;
         const candidates = Object.values(players)
           .filter((p) => p.isAlive && p.playerId !== me?.playerId)
-          .sort((a, b) => a.seat - b.seat);
+          .sort((a, b) => a.seat - b.seat)
+          .map((p) => {
+            let note: string | undefined;
+            if (prevChancellor !== null && p.seat === prevChancellor) note = "TERM-LIMITED · PREVIOUS ENVOY";
+            else if (prevPresident !== null && p.seat === prevPresident) note = "TERM-LIMITED · PREVIOUS PRESIDENT";
+            return { player: p, disabled: Boolean(note), note };
+          });
         return (
           <NominatePanel
             candidates={candidates}
@@ -1467,14 +1511,15 @@ function NominatePanel({
   candidates,
   onNominate,
 }: {
-  candidates: Player[];
+  candidates: Candidate[];
   onNominate: (playerId: string) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
+  const selectedPlayer = candidates.find((c) => c.player.playerId === selected);
   return (
     <Panel
       eyebrow="OFFICIAL BALLOT · FORM N-01"
-      title={"NOMINATE A\nCHANCELLOR"}
+      title={"NOMINATE AN\nENVOY"}
       memo='"Select one eligible delegate to serve alongside you. The Committee will put them to a vote."'
       action={
         <RPButton
@@ -1483,18 +1528,18 @@ function NominatePanel({
           disabled={!selected}
           onClick={() => selected && onNominate(selected)}
         >
-          {selected
-            ? `▸ NOMINATE ${(candidates.find((c) => c.playerId === selected)?.displayName ?? "").toUpperCase()}`
-            : "▸ SELECT A CHANCELLOR"}
+          {selectedPlayer
+            ? `▸ NOMINATE ${(selectedPlayer.player.displayName ?? "").toUpperCase()}`
+            : "▸ SELECT AN ENVOY"}
         </RPButton>
       }
     >
       {candidates.map((c) => (
         <CandidateRow
-          key={c.playerId}
-          candidate={{ player: c }}
-          selected={c.playerId === selected}
-          onSelect={() => setSelected(c.playerId)}
+          key={c.player.playerId}
+          candidate={c}
+          selected={c.player.playerId === selected}
+          onSelect={() => !c.disabled && setSelected(c.player.playerId)}
         />
       ))}
     </Panel>
