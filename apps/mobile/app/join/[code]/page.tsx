@@ -10,7 +10,7 @@ import { RPButton, RPSeal } from "@replicant/ui";
 import { MobileApi, ApiError } from "@/lib/api";
 import { deviceId, resetDeviceId } from "@/lib/deviceId";
 import { clearSession, loadSession, saveSession } from "@/lib/session";
-import { useTokenSupplier } from "@/lib/useToken";
+import { useSignOutSafe, useTokenSupplier } from "@/lib/useToken";
 
 export default function MobileJoinPage() {
   const router = useRouter();
@@ -23,17 +23,26 @@ export default function MobileJoinPage() {
   const [err, setErr] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const getToken = useTokenSupplier();
+  const signOutSafe = useSignOutSafe();
 
-  // ?asNew=1 forces a fresh device identity + clears any prior session.
-  // Lets one browser profile seat multiple players during local QA
-  // without hunting for a second incognito window every time. Strip the
-  // flag from the URL once it's applied so a refresh doesn't keep
-  // re-rolling and churning player rows.
+  // ?asNew=1 forces a completely fresh identity so one browser
+  // profile can seat multiple players during local QA. That means:
+  //   - mobile session (localStorage) cleared
+  //   - deviceId re-rolled
+  //   - Clerk signed out, since incognito WINDOWS share one cookie
+  //     jar. Skipping this step means a Clerk-authed tester would
+  //     keep resolving to their existing User row and the server
+  //     would dedupe them to the same Player.
+  // After the reset we replace() the URL to drop ?asNew=1 so a
+  // refresh doesn't keep re-rolling.
   useEffect(() => {
     if (search?.get("asNew") === "1") {
-      clearSession();
-      resetDeviceId();
-      router.replace(`/join/${code}`);
+      (async () => {
+        clearSession();
+        resetDeviceId();
+        await signOutSafe();
+        router.replace(`/join/${code}`);
+      })();
       return;
     }
     const s = loadSession();
@@ -42,7 +51,7 @@ export default function MobileJoinPage() {
       return;
     }
     setReady(true);
-  }, [code, router, search]);
+  }, [code, router, search, signOutSafe]);
 
   const join = async () => {
     if (!name.trim() || busy) return;

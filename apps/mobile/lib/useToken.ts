@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { useCallback } from "react";
 import { deviceId } from "./deviceId";
 
@@ -49,4 +49,28 @@ export function useSignedIn(): { isSignedIn: boolean; isLoaded: boolean } {
 function useClerkSignedIn() {
   const { isLoaded, isSignedIn } = useAuth();
   return { isSignedIn: Boolean(isSignedIn), isLoaded: Boolean(isLoaded) };
+}
+
+/** Safely returns a sign-out function regardless of whether Clerk is
+ *  mounted. When Clerk is disabled or the user is a guest, this is
+ *  a no-op — callers can fire it unconditionally without checking
+ *  CLERK_ENABLED themselves. */
+export function useSignOutSafe(): () => Promise<void> {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return CLERK_ENABLED ? useClerkSignOut() : useNoopSignOut();
+}
+
+function useClerkSignOut() {
+  const { signOut } = useClerk();
+  return useCallback(async () => {
+    try {
+      await signOut();
+    } catch {
+      /* already signed out or Clerk failed — not fatal */
+    }
+  }, [signOut]);
+}
+
+function useNoopSignOut() {
+  return useCallback(async () => {}, []);
 }
