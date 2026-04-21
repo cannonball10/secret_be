@@ -4,33 +4,77 @@ import (
 	"net/http"
 	"strings"
 
+	authschema "github.com/cannonball10/foundation/schemas/authentication"
 	"github.com/gin-gonic/gin"
 )
 
-// ctxUserIDKey is the gin-context key under which the authenticated
-// user ID is stored by requireAuth.
-const ctxUserIDKey = "ctx.userId"
+// Gin context keys set by requireAuth.
+const (
+	// ctxUserIDKey holds our internal User.UserID (ULID). Handlers
+	// should use userID(c) to read it.
+	ctxUserIDKey = "ctx.userId"
+	// ctxProviderKey holds the authentication provider that verified
+	// this request (clerk, guest). Used by /me + /me/link.
+	ctxProviderKey = "ctx.provider"
+	// ctxAuthIDKey holds the raw external ID (Clerk subject or
+	// deviceId). Used by /me/link to find the prior guest User row.
+	ctxAuthIDKey = "ctx.authId"
+)
 
-// requireAuth is a middleware that enforces a valid bearer token and
-// stashes the resolved user ID on the gin context.
+// requireAuth is a middleware that enforces a valid bearer token,
+// resolves it to an internal User (creating the row on first
+// sighting), and stashes the internal UserID + provider + external
+// ID on the gin context for downstream handlers.
 func (s *Server) requireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractBearerToken(c)
-		userID, err := s.auth.Authenticate(c.Request.Context(), token)
-		if err != nil || userID == "" {
+		externalID, provider, err := s.auth.Authenticate(c.Request.Context(), token)
+		if err != nil || externalID == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "unauthenticated",
 			})
 			return
 		}
-		c.Set(ctxUserIDKey, userID)
+
+		user, err := s.users.Resolve(c.Request.Context(), provider, externalID)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+				"error": "user resolution failed",
+			})
+			return
+		}
+
+		c.Set(ctxUserIDKey, user.UserID)
+		c.Set(ctxProviderKey, provider)
+		c.Set(ctxAuthIDKey, externalID)
 		c.Next()
 	}
 }
 
-// userID pulls the user ID set by requireAuth. Returns "" if absent.
+// userID pulls the internal User.UserID set by requireAuth.
 func userID(c *gin.Context) string {
 	v, ok := c.Get(ctxUserIDKey)
+	if !ok {
+		return ""
+	}
+	s, _ := v.(string)
+	return s
+}
+
+// authProvider pulls the provider that verified this request. Returns
+// "" when no auth middleware has run (e.g. on /healthz).
+func authProvider(c *gin.Context) authschema.AuthenticationProvider {
+	v, ok := c.Get(ctxProviderKey)
+	if !ok {
+		return ""
+	}
+	p, _ := v.(authschema.AuthenticationProvider)
+	return p
+}
+
+// authExternalID pulls the external ID (Clerk subject or deviceId).
+func authExternalID(c *gin.Context) string {
+	v, ok := c.Get(ctxAuthIDKey)
 	if !ok {
 		return ""
 	}

@@ -3,6 +3,8 @@ package game
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"time"
 
 	"github.com/cannonball10/foundation/models"
 	"github.com/cannonball10/foundation/schemas/replicant"
@@ -154,6 +156,75 @@ func (h *GameHandler) endGame(ctx context.Context, game *models.Game, winner rep
 	ev := models.NewGameEvent(game.GameID, replicant.EventGameEnded, "")
 	h.broadcast(ctx, ev, GameEndedPayload{Winner: winner, WinCondition: cond})
 
+	// Record passport stats for every seated player. Losses count
+	// too — GamesPlayed increments regardless of outcome. Failures
+	// here are logged but non-fatal: the game genuinely ended, so we
+	// must not block the state transition on passport bookkeeping.
+	if err := h.recordPassports(ctx, game, winner, cond); err != nil {
+		slog.Warn("passport recording failed", "err", err, "gameId", game.GameID)
+	}
+
 	h.setPhase(ctx, game, replicant.PhaseGameOver, ReasonAction)
 	return h.saveGame(ctx, game)
+}
+
+// recordPassports iterates every player in the game and updates their
+// Passport aggregate + writes a PassportEntry for this game. No-ops
+// quietly if a player has no UserID (shouldn't happen, but defensive).
+func (h *GameHandler) recordPassports(ctx context.Context, game *models.Game, winner replicant.Party, cond replicant.WinCondition) error {
+	players, err := h.loadPlayers(ctx, game.GameID)
+	if err != nil {
+		return err
+	}
+	started := time.Time{}
+	if game.StartedAt != nil {
+		started = *game.StartedAt
+	}
+	ended := h.clock.Now()
+	if game.EndedAt != nil {
+		ended = *game.EndedAt
+	}
+	playerCount := game.PlayerCount
+	if playerCount == 0 {
+		playerCount = len(players)
+	}
+
+	for _, p := range players {
+		if p.UserID == "" {
+			continue
+		}
+		party := replicant.PartyFor(p.Role)
+		won := party == winner
+
+		entry := models.NewPassportEntry(
+			p.UserID, game.GameID, p.PlayerID,
+			p.Role, party, won, cond,
+			p.Seat, playerCount,
+			started, ended,
+		)
+		if err := h.db.Upsert(ctx, nil, entry); err != nil {
+			return err
+		}
+
+		passport, err := h.loadOrCreatePassport(ctx, p.UserID)
+		if err != nil {
+			return err
+		}
+		passport.RecordGame(p.Role, won, ended)
+		if err := h.db.Upsert(ctx, nil, passport); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *GameHandler) loadOrCreatePassport(ctx context.Context, userID string) (*models.Passport, error) {
+	m, err := h.db.Get(ctx, nil, models.PassportKeys.Key(userID))
+	if err != nil {
+		return nil, err
+	}
+	if m == nil {
+		return models.NewPassport(userID), nil
+	}
+	return m.(*models.Passport), nil
 }

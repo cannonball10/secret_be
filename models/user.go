@@ -54,6 +54,17 @@ func NewUser(id *string, authenticationProvider authentication.AuthenticationPro
 	}
 }
 
+// NewGuestUser builds a User keyed on a device token. The deviceID
+// (whatever the mobile client stored in localStorage) becomes the
+// AuthenticationID so the middleware can deterministically resolve
+// the same User row every request. Guests share the same Passport
+// machinery as signed-in users — their stats simply live under a
+// provider=guest row until they sign in, at which point the
+// /me/link endpoint re-parents their PassportEntry history.
+func NewGuestUser(deviceID string) *User {
+	return NewUser(nil, authentication.AuthenticationProvider_Guest, deviceID, "", "", UserRole_User)
+}
+
 func (u *User) PK() string {
 	return UserKeys.PK(u.UserID)
 }

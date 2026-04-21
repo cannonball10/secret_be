@@ -36,6 +36,11 @@ func (s *Server) registerRoutes() {
 	v1 := s.router.Group("/api/v1")
 	v1.Use(s.requireAuth())
 
+	// Identity & passport (for the logged-in / device-authed caller)
+	v1.GET("/me", s.handleMe)
+	v1.POST("/me/link", s.handleLinkGuest)
+	v1.GET("/me/passport", s.handleMyPassport)
+
 	// Lobby & game lookup
 	v1.POST("/games", s.handleCreateGame)
 	v1.POST("/games/join", s.handleJoinGame)

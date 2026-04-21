@@ -72,7 +72,12 @@ func main() {
 	}
 }
 
-// pickAuth returns ClerkAuth when CLERK_SECRET_KEY is set, else NopAuth.
+// pickAuth returns the authenticator to use for every authenticated
+// route. With CLERK_SECRET_KEY set, we wrap Clerk in HybridAuth so
+// that signed-in Clerk JWTs verify normally *and* device tokens
+// still work for guest (anonymous) players — party-game mobile UX
+// can't tolerate a sign-in gate. Without Clerk creds configured,
+// everyone is a guest.
 func pickAuth(ctx context.Context) api.Authenticator {
 	if os.Getenv("CLERK_SECRET_KEY") == "" {
 		return api.NopAuth{}
@@ -82,14 +87,22 @@ func pickAuth(ctx context.Context) api.Authenticator {
 		slog.Warn("clerk init failed, falling back to NopAuth", "err", err)
 		return api.NopAuth{}
 	}
-	return api.ClerkAuth{Connector: conn}
+	return api.HybridAuth{
+		Clerk: api.ClerkAuth{Connector: conn},
+		Guest: api.NopAuth{},
+	}
 }
 
 func authKind(a api.Authenticator) string {
-	if _, ok := a.(api.NopAuth); ok {
+	switch a.(type) {
+	case api.NopAuth:
 		return "nop"
+	case api.HybridAuth:
+		return "hybrid(clerk+guest)"
+	case api.ClerkAuth:
+		return "clerk"
 	}
-	return "clerk"
+	return "custom"
 }
 
 func ginMode() string {

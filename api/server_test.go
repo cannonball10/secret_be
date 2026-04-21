@@ -48,9 +48,14 @@ func (m *memoryDB) Query(_ context.Context, _ *string, input database.QueryInput
 			if !ok || pair.PK != input.PartitionKey {
 				continue
 			}
-			if input.SortKey != nil && input.SortKey.BeginsWith != nil &&
-				!strings.HasPrefix(pair.SK, *input.SortKey.BeginsWith) {
-				continue
+			if input.SortKey != nil {
+				if input.SortKey.BeginsWith != nil &&
+					!strings.HasPrefix(pair.SK, *input.SortKey.BeginsWith) {
+					continue
+				}
+				if input.SortKey.EQ != nil && pair.SK != *input.SortKey.EQ {
+					continue
+				}
 			}
 			results = append(results, v)
 		}
@@ -62,9 +67,14 @@ func (m *memoryDB) Query(_ context.Context, _ *string, input database.QueryInput
 		if len(parts) != 2 || parts[0] != input.PartitionKey {
 			continue
 		}
-		if input.SortKey != nil && input.SortKey.BeginsWith != nil &&
-			!strings.HasPrefix(parts[1], *input.SortKey.BeginsWith) {
-			continue
+		if input.SortKey != nil {
+			if input.SortKey.BeginsWith != nil &&
+				!strings.HasPrefix(parts[1], *input.SortKey.BeginsWith) {
+				continue
+			}
+			if input.SortKey.EQ != nil && parts[1] != *input.SortKey.EQ {
+				continue
+			}
 		}
 		results = append(results, v)
 	}
@@ -157,6 +167,24 @@ func decode(t *testing.T, w *httptest.ResponseRecorder, target any) {
 	if err := json.Unmarshal(w.Body.Bytes(), target); err != nil {
 		t.Fatalf("decode: %v\nbody: %s", err, w.Body.String())
 	}
+}
+
+// authTokenForUser returns the bearer token that, when sent through
+// NopAuth, resolves to the User with the given internal UserID. For
+// guest users the token is just the authentication ID stored on the
+// row (whatever deviceId the test seeded). Lets tests "act as"
+// specific seated players without hard-coding the internal ULID.
+func authTokenForUser(t *testing.T, db *memoryDB, userID string) string {
+	t.Helper()
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	for _, it := range db.items {
+		if u, ok := it.(*models.User); ok && u.UserID == userID {
+			return u.AuthenticationID
+		}
+	}
+	t.Fatalf("authTokenForUser: no User row for %s", userID)
+	return ""
 }
 
 // --- tests -----------------------------------------------------------------
@@ -307,14 +335,21 @@ func TestVote_ByPlayer(t *testing.T) {
 		t.Fatal("could not locate president/chancellor")
 	}
 
-	w := doJSON(t, s, http.MethodPost, "/api/v1/games/"+gameID+"/player/nominate", president.UserID,
+	// Under the new middleware, bearer tokens are the (guest)
+	// external auth ID, not the internal UserID. Find the seeded
+	// User row for each player so we can send its authID as the
+	// token — equivalent to "sign in as that delegate's phone."
+	presTok := authTokenForUser(t, db, president.UserID)
+	chanTok := authTokenForUser(t, db, chancellor.UserID)
+
+	w := doJSON(t, s, http.MethodPost, "/api/v1/games/"+gameID+"/player/nominate", presTok,
 		map[string]string{"chancellorPlayerId": chancellor.PlayerID})
 	if w.Code != http.StatusOK {
 		t.Fatalf("nominate: %d, body=%s", w.Code, w.Body.String())
 	}
 
 	// Cast a vote as any player.
-	w = doJSON(t, s, http.MethodPost, "/api/v1/games/"+gameID+"/player/vote", chancellor.UserID,
+	w = doJSON(t, s, http.MethodPost, "/api/v1/games/"+gameID+"/player/vote", chanTok,
 		map[string]string{"choice": "ja"})
 	if w.Code != http.StatusAccepted {
 		t.Fatalf("vote: %d, body=%s", w.Code, w.Body.String())

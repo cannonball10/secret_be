@@ -36,6 +36,7 @@ type Server struct {
 	hub           game.Hub
 	router        *gin.Engine
 	auth          Authenticator
+	users         *userResolver
 	db            database.DatabaseConnector
 	simulate      bool
 	simConfig     game.SimulationConfig
@@ -119,6 +120,7 @@ func NewServer(opts Options) *Server {
 		engine:        engine,
 		hub:           opts.Hub,
 		auth:          opts.Auth,
+		users:         newUserResolver(opts.Database),
 		db:            opts.Database,
 		router:        gin.New(),
 		simulate:      opts.SimulateOnCreate,
