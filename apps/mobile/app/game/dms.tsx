@@ -21,7 +21,12 @@ export interface DMDrawerProps {
   threads: Record<string, ChatMessagePayload[]>;
   /** Peer ids with at least one message the local device hasn't opened yet. */
   unread: Set<string>;
+  /** Which thread is on screen. null = peer picker. Controlled by parent
+   *  so the SSE handler can tell if the player is literally reading a
+   *  thread right now (and skip marking it unread). */
+  activePeer: string | null;
   onOpenThread: (peerId: string) => void;
+  onBackToPicker: () => void;
   onSend: (peerId: string, body: string) => void | Promise<void>;
   onClose: () => void;
 }
@@ -31,12 +36,12 @@ export function DMDrawer({
   players,
   threads,
   unread,
+  activePeer,
   onOpenThread,
+  onBackToPicker,
   onSend,
   onClose,
 }: DMDrawerProps) {
-  const [activePeer, setActivePeer] = useState<string | null>(null);
-
   // Alive peers, sorted by seat. Skip self + dead.
   const peers = useMemo(
     () =>
@@ -47,7 +52,6 @@ export function DMDrawer({
   );
 
   const openThread = (peerId: string) => {
-    setActivePeer(peerId);
     onOpenThread(peerId);
   };
 
@@ -77,7 +81,7 @@ export function DMDrawer({
       >
         <Header
           label={activePeer ? peerLabel(players[activePeer]) : "DIRECT CHANNELS"}
-          onBack={activePeer ? () => setActivePeer(null) : undefined}
+          onBack={activePeer ? onBackToPicker : undefined}
           onClose={onClose}
         />
 

@@ -95,6 +95,11 @@ export default function MobileGamePage() {
   // peer's playerId so both directions of a thread (authored by me or
   // sent to me) collapse into a single feed with the same peer.
   const [dmOpen, setDmOpen] = useState(false);
+  // Which thread is currently on screen. null = peer picker visible.
+  // Lifted from DMDrawer so the SSE handler can check whether an
+  // incoming DM is for the thread the player is literally staring at
+  // (don't mark it unread if so).
+  const [dmActivePeer, setDmActivePeer] = useState<string | null>(null);
   const [dmThreads, setDmThreads] = useState<Record<string, ChatMessagePayload[]>>({});
   const [dmUnread, setDmUnread] = useState<Set<string>>(() => new Set());
   // Transient toast for inbound DMs when the drawer is closed. Auto-
@@ -433,20 +438,24 @@ export default function MobileGamePage() {
             if (thread.some((m) => m.messageId === p.messageId)) return prev;
             return { ...prev, [peerId]: [...thread, p].slice(-200) };
           });
-          // Only mark unread for incoming messages when the drawer
-          // isn't focused on that peer right now. The drawer's
-          // onOpenThread callback clears the flag.
+          // Only mark unread / toast when the player isn't literally
+          // reading this thread right now. Three cases:
+          //   - drawer closed                  → unread + toast
+          //   - drawer open on peer picker     → unread, no toast
+          //   - drawer open on this thread     → neither (already read)
+          // Without the active-peer check, a message that arrives while
+          // you're watching the thread would stay flagged as unread
+          // until you closed and reopened the drawer.
           if (p.authorPlayerId !== myPlayerId) {
-            setDmUnread((prev) => {
-              if (prev.has(peerId)) return prev;
-              const next = new Set(prev);
-              next.add(peerId);
-              return next;
-            });
-            // Surface a transient toast for inbound DMs when the
-            // drawer isn't already visible so players notice incoming
-            // traffic without staring at the button. Skip if the
-            // drawer is open (they're already looking at messages).
+            const viewingThisThread = dmOpen && dmActivePeer === peerId;
+            if (!viewingThisThread) {
+              setDmUnread((prev) => {
+                if (prev.has(peerId)) return prev;
+                const next = new Set(prev);
+                next.add(peerId);
+                return next;
+              });
+            }
             if (!dmOpen) {
               setDmToast({
                 peerId,
@@ -770,7 +779,9 @@ export default function MobileGamePage() {
           players={players}
           threads={dmThreads}
           unread={dmUnread}
+          activePeer={dmActivePeer}
           onOpenThread={(peerId) => {
+            setDmActivePeer(peerId);
             setDmUnread((prev) => {
               if (!prev.has(peerId)) return prev;
               const next = new Set(prev);
@@ -778,13 +789,17 @@ export default function MobileGamePage() {
               return next;
             });
           }}
+          onBackToPicker={() => setDmActivePeer(null)}
           onSend={(peerId, body) =>
             guard(async () => {
               if (!api || !gameId) return;
               await api.sendDM(gameId, peerId, body);
             })
           }
-          onClose={() => setDmOpen(false)}
+          onClose={() => {
+            setDmOpen(false);
+            setDmActivePeer(null);
+          }}
         />
       )}
 
