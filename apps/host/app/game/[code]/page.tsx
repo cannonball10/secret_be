@@ -233,7 +233,7 @@ export default function HostGamePage() {
   useStream({
     gameId: game?.gameId ?? null,
     role: "board",
-    token,
+    token: getToken,
     onError: () => {
       hadStreamErrorRef.current = true;
     },

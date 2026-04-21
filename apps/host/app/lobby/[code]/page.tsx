@@ -96,7 +96,7 @@ export default function HostLobbyPage() {
   useStream({
     gameId: game?.gameId ?? null,
     role: "board",
-    token,
+    token: getToken,
     onEnvelope: (env: Envelope) => {
       const type = env.event.type;
       if (type === "player_joined") {

@@ -41,6 +41,7 @@ import type {
 import { MobileApi, ApiError } from "@/lib/api";
 import { clearSession, loadSession, patchSession } from "@/lib/session";
 import { useStream } from "@/lib/useStream";
+import { useTokenSupplier } from "@/lib/useToken";
 import {
   CablePanel,
   CandidateRow,
@@ -66,6 +67,11 @@ export default function MobileGamePage() {
 
   const [token, setToken] = useState<string | null>(null);
   const [gameId, setGameId] = useState<string | null>(null);
+  // Async token supplier — Clerk JWTs expire every ~60s, so REST +
+  // SSE both need a live refresh path. MobileApi and useStream both
+  // accept this shape and pull a fresh value on each call / each
+  // reconnect attempt.
+  const getToken = useTokenSupplier();
   const [game, setGame] = useState<Game | null>(null);
   const [players, setPlayers] = useState<Record<string, Player>>({});
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -144,7 +150,7 @@ export default function MobileGamePage() {
 
     (async () => {
       try {
-        const api = new MobileApi({ token: s.token });
+        const api = new MobileApi({ token: getToken });
         const snap = await api.resume(s.gameId);
         hydrateFromResume(snap, s.playerId);
         // DM history — persisted thread so reloads don't start empty.
@@ -224,9 +230,9 @@ export default function MobileGamePage() {
   // is gated on hadStreamErrorRef upstream to avoid racing live
   // envelopes on a clean boot.
   const reconcileSnapshot = useCallback(async () => {
-    if (!gameId || !token || !myPlayerId) return;
+    if (!gameId || !myPlayerId) return;
     try {
-      const api = new MobileApi({ token });
+      const api = new MobileApi({ token: getToken });
       const snap = await api.resume(gameId);
       hydrateFromResume(snap, myPlayerId);
       try {
@@ -257,7 +263,7 @@ export default function MobileGamePage() {
   // ── SSE ────────────────────────────────────────────────────────
   useStream({
     gameId,
-    token,
+    token: getToken,
     onError: () => {
       hadErrorRef.current = true;
     },
@@ -553,7 +559,14 @@ export default function MobileGamePage() {
   const iAmChancellor = !!(me && chancellorPlayerId && me.playerId === chancellorPlayerId);
   const iHaveVoted = me ? !!votedSet[me.playerId] : false;
 
-  const api = useMemo(() => (token ? new MobileApi({ token }) : null), [token]);
+  // Rebuild the api when gameId changes OR when the getToken
+  // supplier identity changes (auth transitions). Within a stable
+  // session the supplier is reference-stable via useCallback, so
+  // this memo survives re-renders.
+  const api = useMemo(
+    () => (gameId ? new MobileApi({ token: getToken }) : null),
+    [gameId, getToken],
+  );
   const guard = useCallback(async (fn: () => Promise<unknown>) => {
     try {
       await fn();
